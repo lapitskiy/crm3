@@ -1,5 +1,5 @@
 import contextlib
-from owm.models import Awaiting, Awaiting_product, Metadata, Settings
+from owm.models import Awaiting, Awaiting_product, Metadata, Settings, Seller
 from typing import Any, Dict
 
 DATABASE_URL = "postgresql+asyncpg://crm3:Billkill13@postgres:5432/postgres"
@@ -84,11 +84,12 @@ def db_check_awaiting_postingnumber(posting_numbers: list):
     result = {'found': found_posting_numbers, 'not_found': not_found_records}
     return result
 
-def db_create_customerorder(not_found_product: dict, market: str):
+def db_create_customerorder(not_found_product: dict, market: str, seller: Seller):
     try:
         for posting_number, products in not_found_product.items():
             # Создаем запись в таблице OwmAwaiting
             awaiting_record = Awaiting.objects.create(
+                seller=seller,
                 posting_number=posting_number,
                 status=products['status'],
                 market=market

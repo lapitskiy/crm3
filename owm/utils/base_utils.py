@@ -24,7 +24,7 @@ logger_error = logging.getLogger('crm3_error')
 
 def get_headers(seller):
     headers = {}
-
+    print(f'seller {seller}')
     moysklad_api = seller.moysklad_api
     yandex_api = seller.yandex_api
     wildberries_api = seller.wildberries_api
@@ -680,12 +680,12 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
 
         ozon_status_fbs_dict = ozon_get_status_fbs(headers=headers) # получаем статусы с озона и сравниваем в базе, если отличаются меняем на МС
 
-        print(f'ozon_status_fbs_dict {ozon_status_fbs_dict}')
-        exit()
+        #print(f'ozon_status_fbs_dict {ozon_status_fbs_dict}')
+        #exit()
         if ozon_awaiting_fbs_dict['not_found']:
            not_found_product = {key: product for key in ozon_awaiting_fbs_dict['not_found'] for product in ozon_current_product if key in product.get('posting_number', '')}
            ms_create_customerorder(headers=headers, not_found_product=not_found_product, seller=seller, market='ozon')
-           db_create_customerorder(not_found_product, market='ozon')
+           db_create_customerorder(not_found_product, market='ozon', seller=seller)
            ms_update_allstock_to_mp(headers=headers, seller=seller)
                #if ozon_status_fbs_dict['received']:
                #    ms_received_order(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['received'])
@@ -695,8 +695,15 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
         if ozon_awaiting_fbs_dict['found']:
            found_product = {key: ozon_current_product[key] for key in ozon_awaiting_fbs_dict['found'] if key in ozon_current_product}
            if ozon_status_fbs_dict:
-               if ozon_status_fbs_dict['delivering']:
+               print(f'ozon_status_fbs_dict {ozon_status_fbs_dict}')
+               exit()
+               if ozon_status_fbs_dict['delivering']: # доставлено
                    ms_delivering_order(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['delivering'])
+               if ozon_status_fbs_dict['received']:
+                   pass
+               if ozon_status_fbs_dict['cancelled']:
+                   pass
+
            #print(f'*' * 40)
            #print(f'found_product {found_product}')
            #print(f'*' * 40)
@@ -792,14 +799,7 @@ def autoupdate_sync_inventory(cron_id):
             'wb': cron.wb,
         }
         if any(cron_active_mp.values()):
-            seller_data = {
-                'moysklad_api': cron.seller.moysklad_api,
-                'yandex_api': cron.seller.yandex_api,
-                'wildberries_api': cron.seller.wildberries_api,
-                'ozon_api': cron.seller.ozon_api,
-                'ozon_id': cron.seller.client_id,
-            }
-            headers = get_headers(seller_data)
+            headers = get_headers(cron.seller)
             result_update_awaiting = update_awaiting_deliver_from_owm(headers=headers, seller=cron.seller, cron_active_mp=cron_active_mp)
             return result_update_awaiting
         else:

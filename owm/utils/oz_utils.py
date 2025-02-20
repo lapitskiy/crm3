@@ -271,13 +271,13 @@ def ozon_get_status_fbs(headers: Dict[str, Any]):
             received = []
             cancelled = []
             try:
-                print(f"ZZZZZZZZZZZZZ")
+                #print(f"ZZZZZZZZZZZZZ")
                 #print(type(json_orders))
-                print(f"ZZZZZZZZZZZZZ")
+                #print(f"ZZZZZZZZZZZZZ")
                 for order in json_orders['result']['postings']:
 
-                    print(type(order))
-                    print(f"posting number: {order}")
+                    #print(type(order))
+                    #print(f"posting number: {order}")
 
                     posting_number = order['posting_number']
                     status = order['status']
@@ -314,7 +314,6 @@ def ozon_get_status_fbs(headers: Dict[str, Any]):
             print(f"ozon_get_status_fbs response.text (awaiting): {response.text}")
     except Exception as e:
         result['error'] = f"Error in awaiting request: {e}"
-    exit()
     return matching_orders
 
 def ozon_get_finance(headers: dict, period: str):

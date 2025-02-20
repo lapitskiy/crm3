@@ -188,13 +188,26 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
 
         article_to_id = {}
 
-        #print(f"products {products}")
         for item in products['response']['rows']:
             article = item.get('article')
             if article:
                 article_to_id[article] = item['id']
 
         orders = copy.deepcopy(not_found_product)  # чтобы избежать изменения исходного
+
+        # Создаём список ключей заказов, которые нужно удалить
+        orders_to_delete = []
+
+        for key, value in orders.items():
+            product_list = value.get('product_list', [])
+
+            # Если хоть один продукт не найден в article_to_id, помечаем заказ на удаление
+            if any(product.get('offer_id') not in article_to_id for product in product_list):
+                orders_to_delete.append(key)
+
+        # Удаляем помеченные заказы
+        for key in orders_to_delete:
+            del orders[key]
 
         for key, value in orders.items():
             product_list = value.get('product_list', [])
@@ -264,6 +277,12 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
 
             # Добавляем позиции для каждого продукта в заказе
             for product in order['product_list']:
+                try:
+                    product_id = product['id']
+                except KeyError:
+                    print(f"Warning: Пропущен продукт без 'id': {product}")
+                    continue  # Пропускаем продукт, если у него нет 'id'
+
                 position = {
                     "quantity": product['quantity'],
                     "price": float(product['price']) * 100,  # переводим цену в копейки
@@ -271,7 +290,7 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
                     "vat": 0,
                     "assortment": {
                         "meta": {
-                            "href": f"https://api.moysklad.ru/api/remap/1.2/entity/product/{product['id']}",
+                            "href": f"https://api.moysklad.ru/api/remap/1.2/entity/product/{product_id}",
                             "type": "product",
                             "mediaType": "application/json"
                         }

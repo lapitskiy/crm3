@@ -269,15 +269,7 @@ class MSMatchingArticle(View):
         seller = Seller.objects.filter(company=user_company).first()
         settings = db_get_settings(seller=seller, type='matching')
         if seller:
-            parser_data = {
-                'moysklad_api': seller.moysklad_api,
-                'yandex_api': seller.yandex_api,
-                'wildberries_api': seller.wildberries_api,
-                'ozon_api': seller.ozon_api,
-                'ozon_id': seller.client_id,
-            }
-
-            headers = get_headers(parser_data)
+            headers = get_headers(seller)
 
             ms_arcticle = ms_get_product(headers)
 
@@ -526,17 +518,12 @@ class SettingsContragent(View):
             return redirect('login')  # или другая страница
         context = {}
 
-        seller = Seller.objects.filter(user=request.user).first()
-        if seller:
-            parser_data = {
-                'moysklad_api': seller.moysklad_api,
-                'yandex_api': seller.yandex_api,
-                'wildberries_api': seller.wildberries_api,
-                'ozon_api': seller.ozon_api,
-                'ozon_id': seller.client_id,
-            }
 
-            headers = get_headers(parser_data)
+        user_company = request.user.userprofile.company
+        seller = Seller.objects.filter(company=user_company).first()
+
+        if seller:
+            headers = get_headers(seller)
 
             meta_all = db_get_metadata(seller=seller)
 
@@ -582,17 +569,10 @@ class SettingsStorage(View):
             return redirect('login')  # или другая страница
         context = {}
 
-        seller = Seller.objects.get(user=request.user)
+        user_company = request.user.userprofile.company
+        seller = Seller.objects.filter(company=user_company).first()
 
-        parser_data = {
-            'moysklad_api': seller.moysklad_api,
-            'yandex_api': seller.yandex_api,
-            'wildberries_api': seller.wildberries_api,
-            'ozon_api': seller.ozon_api,
-            'ozon_id': seller.client_id,
-        }
-
-        headers = get_headers(parser_data)
+        headers = get_headers(seller)
 
         metadata = db_get_metadata(seller=seller.id)
 
@@ -631,17 +611,10 @@ class SettingsStatus(View):
             return redirect('login')  # или другая страница
         context = {}
 
-        seller = Seller.objects.get(user=request.user)
+        user_company = request.user.userprofile.company
+        seller = Seller.objects.filter(company=user_company).first()
 
-        parser_data = {
-            'moysklad_api': seller.moysklad_api,
-            'yandex_api': seller.yandex_api,
-            'wildberries_api': seller.wildberries_api,
-            'ozon_api': seller.ozon_api,
-            'ozon_id': seller.client_id,
-        }
-
-        headers = get_headers(parser_data)
+        headers = get_headers(seller)
 
         metadata = db_get_metadata(seller=seller.id)
 
