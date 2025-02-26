@@ -1,20 +1,12 @@
 from crm3.celery import app
-
 from .models import Crontab
-
 from django.db import close_old_connections
-
 # Создаем отдельный цикл событий в отдельном потоке
-
-
 from celery import group
-
 import logging
-
 from .utils.base_utils import autoupdate_sync_inventory
 
 logger_info = logging.getLogger('crm3_info')
-
 
 @app.task
 def sync_inventory_owm():

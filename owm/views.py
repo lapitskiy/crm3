@@ -16,7 +16,7 @@ from .utils.db_utils import db_update_metadata, db_get_metadata, db_get_settings
 from .utils.ms_utils import ms_update_allstock_to_mp, ms_get_last_enterloss, ms_get_agent_meta, ms_get_organization_meta, ms_get_storage_meta, \
     ms_get_orderstatus_meta, ms_get_product
 from .utils.oz_utils import ozon_get_finance, ozon_get_all_price, ozon_get_postavka, ozon_get_products
-from .utils.wb_utils import wb_get_products
+from .utils.wb_utils import wb_get_products, wb_get_finance
 from .utils.ya_utils import yandex_get_products
 
 from itertools import chain
@@ -796,15 +796,9 @@ class FinanceOzon(View):
 class PostavkaOzon(View):
     def get(self, request, *args, **kwargs):
         context = {}
-        parser = Seller.objects.get(user=request.user)
-        parser_data = {
-            'moysklad_api': parser.moysklad_api,
-            'yandex_api': parser.yandex_api,
-            'wildberries_api': parser.wildberries_api,
-            'ozon_api': parser.ozon_api,
-            'ozon_id': parser.client_id,
-        }
-        headers = get_headers(parser_data)
+        user_company = request.user.userprofile.company
+        parser = Seller.objects.filter(company=user_company).first()
+        headers = get_headers(parser)
         data = ozon_get_postavka(headers)
         # print(f"headers {context['headers']}")
         # print(f"all_total {all_totals}")
@@ -933,15 +927,8 @@ class FinanceWb(View):
         except TypeError:
             return HttpResponse('Пользователь не аутентифицирован', status=401)
 
-        parser_data = {
-            'moysklad_api': parser.moysklad_api,
-            'yandex_api': parser.yandex_api,
-            'wildberries_api': parser.wildberries_api,
-            'ozon_api': parser.ozon_api,
-            'ozon_id': parser.client_id,
-        }
-        headers = get_headers(parser_data)
-        data = get_finance_wb(headers, period='month')
+        headers = get_headers(parser)
+        data = wb_get_finance(headers, period='month')
         context['path'] = data['path']
         context['code'] = data['code']
         context['date'] = data['date']

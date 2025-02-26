@@ -173,7 +173,7 @@ async def ms_check_customerorder(headers: dict):
     return result
 
 def ms_create_customerorder(headers: dict, not_found_product: dict, seller: models.Model, market: str):
-    result = {}
+    result = False
 
     mapping = {
             'ozon': {'storage': 'ms_storage_ozon', 'agent': 'ms_ozon_contragent', 'status': 'ms_status_awaiting'},
@@ -317,10 +317,10 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
 
         # Дополнительные шаги для обработки результата
         if response.status_code != 200:
+            return False
             print(f"Ошибка: сервер вернул код состояния {response.status_code}")
         else:
-            # Продолжайте обработку response_json здесь
-            pass
+            return True
     else:
         raise Exception(f"Error: обновите метадату в настройках Контрагенты")
     return result
