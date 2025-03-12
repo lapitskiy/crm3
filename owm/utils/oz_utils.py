@@ -1,6 +1,8 @@
 import requests
 import datetime
 
+from dateutil.relativedelta import relativedelta
+
 from owm.utils.db_utils import db_check_awaiting_postingnumber, db_get_awaiting
 from owm.utils.ms_utils import ms_get_product
 
@@ -15,6 +17,10 @@ import xlsxwriter
 from typing import Dict, Any
 from django.conf import settings
 import os
+
+from collections import defaultdict
+
+import json
 
 logger_info = logging.getLogger('crm3_info')
 logger_error = logging.getLogger('crm3_error')
@@ -41,7 +47,7 @@ def ozon_update_inventory(headers,stock):
             print(f"Пропущен ключ {key} из-за отсутствия данных 'stock' или пустого словаря.")
     result_json = []
 
-    print(f'ozon_stocks {ozon_stocks}')
+    #print(f'ozon_stocks {ozon_stocks}')
 
     for i in range(0,len(ozon_stocks),100):
         data = {
@@ -54,8 +60,8 @@ def ozon_update_inventory(headers,stock):
     #print(f'data stock {data}')
         response = requests.post(url, headers=headers['ozon_headers'], json=data)
         resp = response.json()
-        print(f'#####')
-        print(f' resp { resp}')
+        #print(f'#####')
+        #print(f' resp { resp}')
         result_json.append(resp['result'])
     context = {
         'json': result_json,
@@ -229,7 +235,7 @@ def ozon_get_status_fbs(headers: Dict[str, Any]):
     orders_db = db_get_awaiting(market='ozon')
     # Получаем список заказов для 'ozon'
     orders_list = orders_db.get('ozon', [])
-    existing_orders = {order['posting_number'] for order in orders_list}
+    existing_orders = {order['posting_number']: order['status'] for order in orders_list}
 
     ozon_headers = headers.get('ozon_headers')
     url_orders = 'https://api-seller.ozon.ru/v3/posting/fbs/list'
@@ -263,17 +269,19 @@ def ozon_get_status_fbs(headers: Dict[str, Any]):
         if response.status_code == 200:
             json_orders = response.json()
             #print(f"json_orders: {json_orders}")
+            #exit()
             #json_orders =
             matching_orders['delivering'] = []
-            matching_orders['received'] = []
             matching_orders['cancelled'] = []
+            matching_orders['delivered'] = []
             delivering = []
-            received = []
+            delivered = []
             cancelled = []
             try:
                 #print(f"ZZZZZZZZZZZZZ")
                 #print(type(json_orders))
                 #print(f"ZZZZZZZZZZZZZ")
+                #print(f"status")
                 for order in json_orders['result']['postings']:
 
                     #print(type(order))
@@ -281,24 +289,28 @@ def ozon_get_status_fbs(headers: Dict[str, Any]):
 
                     posting_number = order['posting_number']
                     status = order['status']
+                    #print(f"status {status}")
                     substatus = order['substatus']
                     #if posting_number == '70611105-0207-1':
                     #    print(f"TYT")
                     #    print(f"TYT: {order}")
+                    #print(f"status {status}")
                     if posting_number in existing_orders and existing_orders[posting_number] != status:
-                        if 'delivering' in status and substatus != 'posting_received':
+                        #print(f"status2 {status}")
+                        if 'delivering' in status:
                             delivering.append({
                                 'posting_number': posting_number,
                                 'status': status,
                                 'substatus': substatus
                             })
-                        if 'posting_received' in substatus:
-                            received.append({
+                        if 'delivered' in status:
+                            delivered.append({
                                 'posting_number': posting_number,
                                 'status': status,
                                 'substatus': substatus
                             })
                         if 'cancelled' in status:
+                            #print(f"TYTTTTT CCCCCC")
                             cancelled.append({
                                 'posting_number': posting_number,
                                 'status': status,
@@ -307,7 +319,7 @@ def ozon_get_status_fbs(headers: Dict[str, Any]):
             except Exception as e:
                 print(f"Error during processing: {e}")
             matching_orders['delivering'] = delivering
-            matching_orders['received'] = received
+            matching_orders['delivered'] = delivered
             matching_orders['cancelled'] = cancelled
         else:
             result['error'] = response.text
@@ -319,7 +331,7 @@ def ozon_get_status_fbs(headers: Dict[str, Any]):
 def ozon_get_finance(headers: dict, period: str):
     products = ms_get_product(headers)
     opt_price_clear = {}
-    print(f"products {products}")
+    #print(f"products {products}")
     if products['status_code'] != 200:
         return {'error': products}
 
@@ -330,17 +342,57 @@ def ozon_get_finance(headers: dict, period: str):
             'opt_price' : int(float(item['buyPrice']['value']) / 100),
             }
 
-    url = "https://api-seller.ozon.ru/v2/finance/realization"
+    #url = "https://api-seller.ozon.ru/v2/finance/realization"
+    url = "https://api-seller.ozon.ru/v3/finance/transaction/list"
     now = datetime.datetime.now()
-    lastmonth_date = now - datetime.timedelta(days=now.day)
+    lastmonth_date = now - relativedelta(months=1)  # Отнимаем 2 месяца
+    #lastmonth_date = now - datetime.timedelta(days=now.day)
+
+    #print(f"lastmonth_date.month {lastmonth_date.month}")
+
+
+    first_day_last_month = (now.replace(day=1) - datetime.timedelta(days=1)).replace(day=1)
+    last_day_last_month = now.replace(day=1) - datetime.timedelta(days=1)
+    first_day_last_month_iso = first_day_last_month.strftime('%Y-%m-%dT00:00:00.000Z')
+    last_day_last_month_iso = last_day_last_month.strftime('%Y-%m-%dT23:59:59.999Z')
     data = {
-        "year": lastmonth_date.year,
-        "month": lastmonth_date.month
-    }
+        "filter": {
+            "date": {
+                "from": first_day_last_month_iso,
+                "to": last_day_last_month_iso
+                },
+            "operation_type": [ ],
+            "posting_number": "",
+            "transaction_type": "all"
+            },
+            "page": 1,
+            "page_size": 1000
+        }
+
+    #data = {
+    #    "year": lastmonth_date.year,
+    #    "month": lastmonth_date.month
+    #}
+
+
 
     response = requests.post(url, headers=headers['ozon_headers'], json=data).json()
     #print(f"utils.py | get_all_price_ozon | response: {response}")
     #print(f"realization {response['result']['rows']}")
+
+    grouped_data = defaultdict(list)
+    data_list = response['result']['operations']
+    for entry in data_list:
+        posting_number = entry['posting'].get('posting_number', 'unknown')  # В случае отсутствия значения подставляется 'unknown'
+        grouped_data[posting_number].append(entry)
+
+    # Преобразуем defaultdict в обычный словарь
+    grouped_data = dict(grouped_data)
+
+    # Выводим результат в JSON-формате для удобства чтения
+    print(json.dumps(grouped_data, indent=4, ensure_ascii=False))
+
+    print(f"realization {grouped_data}")
     result = {}
     summed_totals = {}
     header_data = response.get('result', {}).get('header', [])

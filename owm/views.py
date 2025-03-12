@@ -762,14 +762,7 @@ class FinanceOzon(View):
         context = {}
         user_company = request.user.userprofile.company
         parser = Seller.objects.filter(company=user_company).first()
-        parser_data = {
-            'moysklad_api': parser.moysklad_api,
-            'yandex_api': parser.yandex_api,
-            'wildberries_api': parser.wildberries_api,
-            'ozon_api': parser.ozon_api,
-            'ozon_id': parser.client_id,
-        }
-        headers = get_headers(parser_data)
+        headers = get_headers(parser)
         data = ozon_get_finance(headers, period='month')
         if 'error' not in data:
             context['report'] = data['sorted_report']  # dict(list(price.items())[:1]) # price

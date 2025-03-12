@@ -242,7 +242,7 @@ def wb_get_products(headers):
     return all_item
 
 def wb_get_finance(headers: dict, period: str):
-    opt_price = ms_get_product(headers['moysklad_headers'])
+    opt_price = ms_get_product()
     opt_price_clear = {}
     for item in opt_price['rows']:
         #opt_price_clear['article'] = item['article']

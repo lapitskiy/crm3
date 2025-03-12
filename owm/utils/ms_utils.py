@@ -150,6 +150,56 @@ def ms_get_storage_meta(headers: Dict[str, Any]) -> List[Dict[str, str]]:
         logger_error.error(f"ms_get_storage_meta: исключение - {str(e)}")
     return result
 
+# получаем последние название оприходвание и списания и пишем в базу
+def ms_get_last_enterloss(headers: dict):
+    result = {}
+
+    moysklad_headers = headers.get('moysklad_headers')
+    # оприходование
+    url = 'https://api.moysklad.ru/api/remap/1.2/entity/enter'
+    params = {
+        'limit': 1,
+        'order': 'created,desc'
+        }
+    response = requests.get(url, headers=moysklad_headers, params=params)
+    if response.status_code == 200:
+        response_json = response.json()
+        tag = response_json
+        result['enter'] = tag['rows'][0]['name']
+    else:
+        error_message = response.text
+        raise Exception(f"Error {response.status_code}: {error_message}")
+
+    url = 'https://api.moysklad.ru/api/remap/1.2/entity/loss'
+    response = requests.get(url, headers=moysklad_headers, params=params)
+    if response.status_code == 200:
+        response_json = response.json()
+        tag = response_json
+        result['loss'] = tag['rows'][0]['name']
+    else:
+        error_message = response.text
+        raise Exception(f"Error {response.status_code}: {error_message}")
+    return result
+
+# получаем список заказов покуателей
+def ms_get_customorders(headers):
+    moysklad_headers = headers.get('moysklad_headers')
+    url = "https://api.moysklad.ru/api/remap/1.2/entity/customerorder"
+    params = [
+        ("limit", 1000)
+    ]
+    result = {}
+    response = requests.get(url, headers=moysklad_headers, params=params)
+
+    if response.status_code == 200:
+        result['status_code'] = response.status_code
+        result['response'] = response.json()
+    else:
+        result['status_code'] = response.status_code
+        result['response'] = response.text
+        logger_error.error(f"error ms_get_product: {response.text}")
+    return result
+
 
 async def ms_check_customerorder(headers: dict):
     result = {}
@@ -171,6 +221,34 @@ async def ms_check_customerorder(headers: dict):
                 error_message = await response.text()
                 result['response'] = error_message
     return result
+
+
+# остатки на МС отравляем на все MP
+def ms_update_allstock_to_mp(headers, seller):
+    '''
+    Получаем остатки с МойСклад и выставляем такие же на Озон, Вб, Яндекс
+    '''
+    from owm.utils.oz_utils import ozon_update_inventory
+    from owm.utils.wb_utils import wb_update_inventory
+    from owm.utils.ya_utils import yandex_update_inventory
+
+    context = {}
+
+    moysklad_headers = headers.get('moysklad_headers')
+    metadata = db_get_metadata(seller)
+
+    stock = ms_get_all_stock(moysklad_headers, metadata)
+    #print(f'stock {stock}')
+    context['ozon'] = ozon_update_inventory(headers, stock)
+    context['yandex'] = yandex_update_inventory(headers, stock)
+    context['wb'] = wb_update_inventory(headers, stock)
+    return context
+
+def ms_cancel_order(headers: Dict[str, Any], posting_number: str):
+    '''
+    Обновляем статус и отменяем заказ на МойСклад
+    '''
+    pass
 
 def ms_create_customerorder(headers: dict, not_found_product: dict, seller: models.Model, market: str):
     result = False
@@ -309,7 +387,7 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
             #logging.info(f"[seller {seller.id}][ms_create_customerorder][response json]: {response.json()}")
             #print(f"*" * 40)
             #print(f"*" * 40)
-            #print(f"response_json MS: {response_json}")
+            #print(f"response_json MS: {response.json()}")
             #print(f"*" * 40)
             #print(f"*" * 40)
         except requests.exceptions.JSONDecodeError:
@@ -325,68 +403,17 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
         raise Exception(f"Error: обновите метадату в настройках Контрагенты")
     return result
 
-# получаем последние название оприходвание и списания и пишем в базу
-def ms_get_last_enterloss(headers: dict):
-    result = {}
-
-    moysklad_headers = headers.get('moysklad_headers')
-    # оприходование
-    url = 'https://api.moysklad.ru/api/remap/1.2/entity/enter'
-    params = {
-        'limit': 1,
-        'order': 'created,desc'
-        }
-    response = requests.get(url, headers=moysklad_headers, params=params)
-    if response.status_code == 200:
-        response_json = response.json()
-        tag = response_json
-        result['enter'] = tag['rows'][0]['name']
-    else:
-        error_message = response.text
-        raise Exception(f"Error {response.status_code}: {error_message}")
-
-    url = 'https://api.moysklad.ru/api/remap/1.2/entity/loss'
-    response = requests.get(url, headers=moysklad_headers, params=params)
-    if response.status_code == 200:
-        response_json = response.json()
-        tag = response_json
-        result['loss'] = tag['rows'][0]['name']
-    else:
-        error_message = response.text
-        raise Exception(f"Error {response.status_code}: {error_message}")
-    return result
-
-# остатки на МС отравляем на все MP
-def ms_update_allstock_to_mp(headers, seller):
-    '''
-    Получаем остатки с МойСклад и выставляем такие же на Озон, Вб, Яндекс
-    '''
-    from owm.utils.oz_utils import ozon_update_inventory
-    from owm.utils.wb_utils import wb_update_inventory
-    from owm.utils.ya_utils import yandex_update_inventory
-
-    context = {}
-
-    moysklad_headers = headers.get('moysklad_headers')
-    metadata = db_get_metadata(seller)
-
-    stock = ms_get_all_stock(moysklad_headers, metadata)
-    #print(f'stock {stock}')
-    context['ozon'] = ozon_update_inventory(headers, stock)
-    context['yandex'] = yandex_update_inventory(headers, stock)
-    context['wb'] = wb_update_inventory(headers, stock)
-    return context
-
-def ms_cancel_order(headers: Dict[str, Any], posting_number: str):
-    '''
-    Обновляем статус и отменяем заказ на МойСклад
-    '''
-    pass
-
-def ms_delivering_order(headers: Dict[str, Any], seller: models.Model, market: str, orders: list):
+def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: str, orders: list):
     '''
     Обновляем статус и отгружаем заказ на МойСклад
     '''
+
+    response_data = ms_get_customorders(headers)
+    ms_orders_dict = {order["name"]: order["id"] for order in response_data["response"]["rows"]}
+    print(f"*" * 40)
+    print(f'response ms_get_customorders: {response_data["response"]["rows"][0]}')
+    print(f"*" * 40)
+
     result = {}
 
     mapping = {
@@ -398,7 +425,7 @@ def ms_delivering_order(headers: Dict[str, Any], seller: models.Model, market: s
     metadata = db_get_metadata(seller)
 
 
-    url = 'https://api.moysklad.ru/api/remap/1.2/entity/customerorder'
+    url = 'https://api.moysklad.ru/api/remap/1.2/entity/demand'
 
 
     organization_meta = {
@@ -431,36 +458,56 @@ def ms_delivering_order(headers: Dict[str, Any], seller: models.Model, market: s
     data = []
 
     for order in orders:
+        print(f"TYT {ms_orders_dict[order['posting_number']]}")
         order_data = {
             "name": str(order['posting_number']),
             "vatEnabled": False,
             "applicable": True,
             "state": {
                 "meta": status_meta
-            }
+            },
+            "organization": {
+                "meta": organization_meta
+            },
+            "agent": {
+                "meta": agent_meta
+            },
+            "store": {
+                "meta": storage_meta
+            },
+            "customerOrder": {
+                "meta": {
+                  "href": f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/{ms_orders_dict[order['posting_number']]}",
+                  "type": "customerorder",
+                  "mediaType": "application/json"
+                }
+            },
+
+
+
+
         }
         # Добавляем сформированный заказ в общий список
         data.append(order_data)
+        break
+    try:
+        response = requests.post(url, headers=moysklad_headers, json=data)
+        #logging.info(f"[seller {seller.id}][ms_create_customerorder][response json]: {response.json()}")
+        #print(f"*" * 40)
+        print(f"*" * 40)
+        print(f"response_json ms_delivering_order: {response.json()}")
+        print(f"*" * 40)
+        exit()
+        #print(f"*" * 40)
+    except requests.exceptions.JSONDecodeError:
+        logging.error(f"[seller {seller.id}][ms_create_customerorder][response text]: {response.text}")
 
-        try:
-            response = requests.post(url, headers=moysklad_headers, json=data)
-            #logging.info(f"[seller {seller.id}][ms_create_customerorder][response json]: {response.json()}")
-            #print(f"*" * 40)
-            #print(f"*" * 40)
-            #print(f"response_json MS: {response_json}")
-            #print(f"*" * 40)
-            #print(f"*" * 40)
-        except requests.exceptions.JSONDecodeError:
-            logging.error(f"[seller {seller.id}][ms_create_customerorder][response text]: {response.text}")
-
-        # Дополнительные шаги для обработки результата
-        if response.status_code != 200:
-            print(f"Ошибка: сервер вернул код состояния {response.status_code}")
-        else:
-            # Продолжайте обработку response_json здесь
-            pass
+    # Дополнительные шаги для обработки результата
+    if response.status_code != 200:
+        print(f"Ошибка: сервер вернул код состояния {response.status_code}")
     else:
-        raise Exception(f"Error: обновите метадату в настройках Контрагенты")
+        # Продолжайте обработку response_json здесь
+        pass
     return result
 
 
