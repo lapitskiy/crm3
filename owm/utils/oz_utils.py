@@ -329,6 +329,15 @@ def ozon_get_status_fbs(headers: Dict[str, Any]):
     return matching_orders
 
 def ozon_get_finance(headers: dict, period: str):
+    ozon_products = ozon_get_products(headers)
+    sku_offer_id = {
+        source["sku"]: item["offer_id"]
+        for item in ozon_products
+        for source in item["sources"]
+    }
+
+    #print(json.dumps(prod_ozon['items'], indent=4, ensure_ascii=False))
+
     products = ms_get_product(headers)
     opt_price_clear = {}
     #print(f"products {products}")
@@ -339,13 +348,25 @@ def ozon_get_finance(headers: dict, period: str):
         #opt_price_clear['article'] = item['article']
         #print(f"opt_price {item['buyPrice']['value']/100}")
         opt_price_clear[item['article']] = {
-            'opt_price' : int(float(item['buyPrice']['value']) / 100),
+            'opt_price': int(float(item['buyPrice']['value']) / 100) if 'buyPrice' in item and 'value' in item['buyPrice'] else 0
             }
 
-    #url = "https://api-seller.ozon.ru/v2/finance/realization"
-    url = "https://api-seller.ozon.ru/v3/finance/transaction/list"
     now = datetime.datetime.now()
-    lastmonth_date = now - relativedelta(months=1)  # Отнимаем 2 месяца
+
+    #url = "https://api-seller.ozon.ru/v2/finance/realization"
+    #lastmonth_date = now - relativedelta(months=1)
+    #data = {
+    #    "year": lastmonth_date.year,
+    #    "month": lastmonth_date.month
+    #}
+
+    #response = requests.post(url, headers=headers['ozon_headers'], json=data).json()
+
+    #print(json.dumps(response['result']['rows'], indent=4, ensure_ascii=False))
+    #print(f"response 1 {response['result']['rows']}")
+
+    url = "https://api-seller.ozon.ru/v3/finance/transaction/list"
+    # Отнимаем 2 месяца
     #lastmonth_date = now - datetime.timedelta(days=now.day)
 
     #print(f"lastmonth_date.month {lastmonth_date.month}")
@@ -392,15 +413,21 @@ def ozon_get_finance(headers: dict, period: str):
     # Выводим результат в JSON-формате для удобства чтения
     print(json.dumps(grouped_data, indent=4, ensure_ascii=False))
 
-    print(f"realization {grouped_data}")
+    #print(f"realization {grouped_data}")
     result = {}
     summed_totals = {}
-    header_data = response.get('result', {}).get('header', [])
     all_return_total = 0
     #print(f"opt_price_clear {opt_price_clear}")
 
-    for item in response.get('result', {}).get('rows', []):
-        offer_id = item['item'].get('offer_id')
+    for posting_number, items in grouped_data.items():
+        for item in items:
+
+
+
+
+
+
+        offer_id = items['item'].get('offer_id')
         if offer_id not in opt_price_clear:
             continue
         if item.get('return_commission') is not None:
@@ -490,8 +517,9 @@ def ozon_get_finance(headers: dict, period: str):
 
     locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
 
-    start_date = datetime.datetime.strptime(header_data['start_date'], '%Y-%m-%d')
-    stop_date = datetime.datetime.strptime(header_data['stop_date'], '%Y-%m-%d')
+    start_date = datetime.datetime.strptime(first_day_last_month_iso[:10], '%Y-%m-%d')
+    stop_date = datetime.datetime.strptime(last_day_last_month_iso[:10], '%Y-%m-%d')
+
     month_name = start_date.strftime('%B')
     morph = pymorphy2.MorphAnalyzer()
     month_nominative = morph.parse(month_name)[0].inflect({'nomn'}).word
