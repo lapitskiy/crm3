@@ -330,16 +330,19 @@ def ozon_get_status_fbs(headers: Dict[str, Any]):
 
 def ozon_get_finance(headers: dict, period: str):
     ozon_products = ozon_get_products(headers)
+
+
+
     sku_offer_id = {
         source["sku"]: item["offer_id"]
-        for item in ozon_products
+        for item in ozon_products['items']
         for source in item["sources"]
     }
 
     #print(json.dumps(prod_ozon['items'], indent=4, ensure_ascii=False))
 
     products = ms_get_product(headers)
-    opt_price_clear = {}
+    ms_opt_price_clear = {}
     #print(f"products {products}")
     if products['status_code'] != 200:
         return {'error': products}
@@ -347,7 +350,7 @@ def ozon_get_finance(headers: dict, period: str):
     for item in products['response']['rows']:
         #opt_price_clear['article'] = item['article']
         #print(f"opt_price {item['buyPrice']['value']/100}")
-        opt_price_clear[item['article']] = {
+        ms_opt_price_clear[item['article']] = {
             'opt_price': int(float(item['buyPrice']['value']) / 100) if 'buyPrice' in item and 'value' in item['buyPrice'] else 0
             }
 
@@ -411,7 +414,7 @@ def ozon_get_finance(headers: dict, period: str):
     grouped_data = dict(grouped_data)
 
     # Выводим результат в JSON-формате для удобства чтения
-    print(json.dumps(grouped_data, indent=4, ensure_ascii=False))
+    #print(json.dumps(grouped_data, indent=4, ensure_ascii=False))
 
     #print(f"realization {grouped_data}")
     result = {}
@@ -419,60 +422,47 @@ def ozon_get_finance(headers: dict, period: str):
     all_return_total = 0
     #print(f"opt_price_clear {opt_price_clear}")
 
+    # - Если цена продажи sale_price будет 0, тогда пропускать этот товар для вывода в общий список продаж
+
     for posting_number, items in grouped_data.items():
+        sale_price = 0 # цена продажи
+        payoff = 0
+        new_entry = {}
         for item in items:
+            sku = item.get('sku')
+            offer_id = sku_offer_id.get(sku)
+            sale_price += item.get('accruals_for_sale', 0)
+            payoff += item.get('amount', 0)
+            opt = ms_opt_price_clear[offer_id]['opt_price']
+            name = item.get('name', 'unknown')
 
 
-
-
-
-
-        offer_id = items['item'].get('offer_id')
-        if offer_id not in opt_price_clear:
-            continue
-        if item.get('return_commission') is not None:
-            all_return_total += int(item['return_commission']['total'])
-        if item.get('delivery_commission') is not None:
-            # Получаем 'quantity' из каждого словаря с параметром по умолчанию равным 0, если ключ отсутствует
-            opt = opt_price_clear[offer_id]['opt_price']
-            if item.get('return_commission') is not None:
-                delivery_quantity = item.get('delivery_commission').get('quantity', 0)
-                return_quantity = item.get('return_commission').get('quantity', 0)
-                if delivery_quantity > return_quantity:
-                    new_entry = {
-                        'total_price': int(item['delivery_commission']['total']) - int(item['return_commission']['total']),
-                        'quantity': int(item['delivery_commission']['quantity']) - int(item['return_commission']['quantity']),
-                    }
-                else:
-                    continue
-
-            else:
-                new_entry = {
-                    'total_price': int(item['delivery_commission']['total']),
-                    'quantity': int(item['delivery_commission']['quantity'])
-                }
-            new_entry.update({
-                'name': item['item']['name'],
-                'product_id': int(item['item']['sku']),
-                'seller_price_per_instance': int(item['seller_price_per_instance']),
-                'opt': int(opt)
+        new_entry.update({
+            'quantity': 1,
+            'name': name,
+            'product_id': int(sku),
+            'sale_price': int(sale_price),
+            'opt': int(opt),
+            'payoff': int(payoff), # к выплате
             })
-            net_profit = new_entry['total_price'] - (opt * new_entry['quantity'])
-            net_profit_perc = (net_profit / (opt * new_entry['quantity'])) * 100 if opt * new_entry[
-                'quantity'] != 0 else 0
-            posttax_profit = net_profit - (new_entry['total_price'] * 0.06)
-            posttax_profit_perc = (posttax_profit / (opt * new_entry['quantity'])) * 100 if opt * new_entry[
-                'quantity'] != 0 else 0
-            new_entry.update({
-                'net_profit': net_profit,
-                'net_profit_perc': int(net_profit_perc),
-                'posttax_profit': posttax_profit,
-                'posttax_profit_perc': int(posttax_profit_perc),
-            })
-            if offer_id in result:
-                result[offer_id].append(new_entry)
-            else:
-                result[offer_id] = [new_entry]
+        net_profit = int(payoff) - int(opt)
+        net_profit_perc = (net_profit / int(opt)) * 100
+        posttax_profit = net_profit - (int(payoff) * 0.06)
+        posttax_profit_perc = (posttax_profit / int(opt)) * 100
+        new_entry.update({
+            'net_profit': int(net_profit),
+            'net_profit_perc': int(net_profit_perc),
+            'posttax_profit': int(posttax_profit),
+            'posttax_profit_perc': int(posttax_profit_perc),
+        })
+
+
+        if offer_id in result:
+            result[offer_id].append(new_entry)
+        else:
+            result[offer_id] = [new_entry]
+
+
 
     #print(f'result ozon price {result}')
     # seller_price_per_instance Цена продавца с учётом скидки.
