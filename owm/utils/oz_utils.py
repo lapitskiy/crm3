@@ -420,41 +420,51 @@ def ozon_get_finance(headers: dict, period: str):
     result = {}
     summed_totals = {}
     all_return_total = 0
-    #print(f"opt_price_clear {opt_price_clear}")
+    print(f"sku_offer_id {sku_offer_id}")
 
     # - Если цена продажи sale_price будет 0, тогда пропускать этот товар для вывода в общий список продаж
 
     for posting_number, items in grouped_data.items():
+        print(f"№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№")
         sale_price = 0 # цена продажи
         payoff = 0
         new_entry = {}
+        print(f'items {items}')
         for item in items:
-            sku = item.get('sku')
-            offer_id = sku_offer_id.get(sku)
+            print(f"^^^^^^^^^^^^^^^^^^")
+            item_s = item.get('items')
+            print(f'item_s {item_s}\n')
+            if item_s and len(item_s) > 0:
+                sku = item_s[0].get('sku')
+                offer_id = sku_offer_id.get(sku)
+                opt_data = ms_opt_price_clear.get(offer_id)
+                opt = opt_data.get('opt_price') if opt_data else None
+                name = item.get('name', 'unknown')
+                print(f'sku {sku} offer_id {offer_id}\n')
+                print(f'ms_opt_price_clear[offer_id] {ms_opt_price_clear[offer_id]}\n')
+
             sale_price += item.get('accruals_for_sale', 0)
             payoff += item.get('amount', 0)
-            opt = ms_opt_price_clear[offer_id]['opt_price']
-            name = item.get('name', 'unknown')
-
-
-        new_entry.update({
-            'quantity': 1,
-            'name': name,
-            'product_id': int(sku),
-            'sale_price': int(sale_price),
-            'opt': int(opt),
-            'payoff': int(payoff), # к выплате
+            print(f'item {item}\n')
+        if opt is not None:
+            new_entry.update({
+                'quantity': 1,
+                'name': name,
+                'product_id': int(sku),
+                'sale_price': int(sale_price),
+                'opt': int(opt),
+                'payoff': int(payoff), # к выплате
+                })
+            net_profit = int(payoff) - int(opt)
+            net_profit_perc = (net_profit / int(opt)) * 100
+            posttax_profit = net_profit - (int(payoff) * 0.06)
+            posttax_profit_perc = (posttax_profit / int(opt)) * 100
+            new_entry.update({
+                'net_profit': int(net_profit),
+                'net_profit_perc': int(net_profit_perc),
+                'posttax_profit': int(posttax_profit),
+                'posttax_profit_perc': int(posttax_profit_perc),
             })
-        net_profit = int(payoff) - int(opt)
-        net_profit_perc = (net_profit / int(opt)) * 100
-        posttax_profit = net_profit - (int(payoff) * 0.06)
-        posttax_profit_perc = (posttax_profit / int(opt)) * 100
-        new_entry.update({
-            'net_profit': int(net_profit),
-            'net_profit_perc': int(net_profit_perc),
-            'posttax_profit': int(posttax_profit),
-            'posttax_profit_perc': int(posttax_profit_perc),
-        })
 
 
         if offer_id in result:
