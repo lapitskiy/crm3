@@ -520,10 +520,6 @@ def ms_received_order(headers: Dict[str, Any], posting_number: str):
 
 
 
-
-
-
-
 def ms_get_all_stock(headers, metadata):
     '''
     получаем с МойСклад список всех ОСТАТКОВ
@@ -543,10 +539,16 @@ def ms_get_all_stock(headers, metadata):
         ("filter", "quantityMode=all"),
         ("filter", f"store={store_id}")
     ]
-    print('TYT')
     response = requests.get(url, headers=headers, params=params).json()
     #print(f'ms_get_all_stock response {response}')
     for stock in response['rows']:
-        stock_tuple[stock['article']] = {'stock': int(stock['stock']), 'price' : stock['salePrice']/100 }
+        try:
+            stock_tuple[stock['article']] = {
+                'stock': int(stock['stock']),
+                'price': stock['salePrice'] / 100
+            }
+        except KeyError as e:
+            print(f"Пропущена запись из-за отсутствующего ключа: {e}")
+            continue
     sorted_stock_tuple = OrderedDict(sorted(stock_tuple.items()))
     return sorted_stock_tuple

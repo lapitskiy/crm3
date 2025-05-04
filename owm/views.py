@@ -393,9 +393,9 @@ class AutoupdateSettings(View):
             context['active_wb'] = obj.wb
 
             try:
-                headers = get_headers(parser_data, seller)
+                headers = get_headers(seller)
             except Exception as e:
-                print("Error occurred:", e)
+                print("AutoupdateSettings Error occurred:", e)
 
             cron_data = {
                 'cron_dict': obj.crontab_dict,

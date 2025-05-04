@@ -83,6 +83,7 @@ def user_login(request):
         if form.is_valid():
             user = form.get_user()
             login(request, user)
+            print('tyt')
             return redirect('news_home')
     else:
         context['form'] = UserLoginForm()

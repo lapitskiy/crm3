@@ -331,8 +331,6 @@ def ozon_get_status_fbs(headers: Dict[str, Any]):
 def ozon_get_finance(headers: dict, period: str):
     ozon_products = ozon_get_products(headers)
 
-
-
     sku_offer_id = {
         source["sku"]: item["offer_id"]
         for item in ozon_products['items']
@@ -368,6 +366,7 @@ def ozon_get_finance(headers: dict, period: str):
     #print(json.dumps(response['result']['rows'], indent=4, ensure_ascii=False))
     #print(f"response 1 {response['result']['rows']}")
 
+    # https://docs.ozon.ru/api/seller/#operation/FinanceAPI_FinanceTransactionListV3
     url = "https://api-seller.ozon.ru/v3/finance/transaction/list"
     # Отнимаем 2 месяца
     #lastmonth_date = now - datetime.timedelta(days=now.day)
@@ -379,85 +378,125 @@ def ozon_get_finance(headers: dict, period: str):
     last_day_last_month = now.replace(day=1) - datetime.timedelta(days=1)
     first_day_last_month_iso = first_day_last_month.strftime('%Y-%m-%dT00:00:00.000Z')
     last_day_last_month_iso = last_day_last_month.strftime('%Y-%m-%dT23:59:59.999Z')
-    data = {
-        "filter": {
-            "date": {
-                "from": first_day_last_month_iso,
-                "to": last_day_last_month_iso
+    print(f"first_day_last_month_iso {first_day_last_month_iso}")
+    print(f"last_day_last_month_iso {last_day_last_month_iso}")
+
+    page_size = 1000  # максимум, который разрешён API
+    page = 1  # начинаем с первой страницы
+    all_operations = []  # здесь соберём все операции
+
+    while True:
+        payload = {
+            "filter": {
+                "date": {
+                    "from": first_day_last_month_iso,
+                    "to": last_day_last_month_iso
                 },
-            "operation_type": [ ],
-            "posting_number": "",
-            "transaction_type": "all"
+                "operation_type": [],  # или перечислите нужные
+                "posting_number": "",
+                "transaction_type": "all"
             },
-            "page": 1,
-            "page_size": 1000
+            "page": page,
+            "page_size": page_size
         }
+        #data = {
+        #    "year": lastmonth_date.year,
+        #    "month": lastmonth_date.month
+        #}
 
-    #data = {
-    #    "year": lastmonth_date.year,
-    #    "month": lastmonth_date.month
-    #}
+        response = requests.post(url, headers=headers['ozon_headers'], json=payload).json()
+        result = response.get("result", {})
+        operations = result.get("operations", [])
+        all_operations.extend(operations)
 
+        print(f"realization {page}")
+        print(response["result"]["operations"][:1])
+        if page >= result.get("page_count", 0) or not operations:
+            break
+        page += 1  # иначе берём следующую страницу
 
+    print(f"Собрано операций: {len(all_operations)}")
 
-    response = requests.post(url, headers=headers['ozon_headers'], json=data).json()
-    #print(f"utils.py | get_all_price_ozon | response: {response}")
-    #print(f"realization {response['result']['rows']}")
 
     grouped_data = defaultdict(list)
-    data_list = response['result']['operations']
-    for entry in data_list:
-        posting_number = entry['posting'].get('posting_number', 'unknown')  # В случае отсутствия значения подставляется 'unknown'
-        grouped_data[posting_number].append(entry)
+    #print(json.dumps(data_list, indent=4, ensure_ascii=False))
+    # Сначала создаём временный словарь для хранения всех posting_number
+    for entry in all_operations:
+        raw_pn = entry['posting'].get('posting_number', 'unknown')
+        base_pn = ozon_get_base_posting_number(raw_pn)
+        grouped_data[base_pn].append(entry)
 
-    # Преобразуем defaultdict в обычный словарь
     grouped_data = dict(grouped_data)
 
     # Выводим результат в JSON-формате для удобства чтения
     #print(json.dumps(grouped_data, indent=4, ensure_ascii=False))
-
+    #exit()
     #print(f"realization {grouped_data}")
     result = {}
     summed_totals = {}
+    total_payoff = 0
+    payoff_if = 0
     all_return_total = 0
-    print(f"sku_offer_id {sku_offer_id}")
+    #print(f"sku_offer_id {sku_offer_id}")
 
     # - Если цена продажи sale_price будет 0, тогда пропускать этот товар для вывода в общий список продаж
 
     for posting_number, items in grouped_data.items():
-        print(f"№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№")
+        #print(f"№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№")
+        print(f"posting_number {posting_number}\n\n")
+
         sale_price = 0 # цена продажи
         payoff = 0
         new_entry = {}
         print(f'items {items}')
         for item in items:
-            print(f"^^^^^^^^^^^^^^^^^^")
+            #print(f"^^^^^^^^^^^^^^^^^^")
             item_s = item.get('items')
-            print(f'item_s {item_s}\n')
+            #print(f'item_s {item_s}\n')
             if item_s and len(item_s) > 0:
                 sku = item_s[0].get('sku')
                 offer_id = sku_offer_id.get(sku)
                 opt_data = ms_opt_price_clear.get(offer_id)
-                opt = opt_data.get('opt_price') if opt_data else None
+                opt = opt_data.get('opt_price') if opt_data else 0
                 name = item.get('name', 'unknown')
-                print(f'sku {sku} offer_id {offer_id}\n')
-                print(f'ms_opt_price_clear[offer_id] {ms_opt_price_clear[offer_id]}\n')
+                #print(f'sku {sku} offer_id {offer_id}\n')
+                #print(f'opt {opt}\n')
 
-            sale_price += item.get('accruals_for_sale', 0)
-            payoff += item.get('amount', 0)
-            print(f'item {item}\n')
-        if opt is not None:
+            accruals = item.get('accruals_for_sale', 0)
+            if accruals != 0:  # учитываем только товарные строки
+                sale_price += accruals
+            payoff += item.get('amount', 0)  # все строки влияют на выплату
+        service_fees = sale_price - payoff
+        print(f'sale_price {sale_price}\n')
+        print(f'payoff {payoff}\n')
+        print(f'service_fees {service_fees}\n')
+        print(f"^^^^^^^^^^^^^^^^^^")
+        print(f"^^^^^^^^^^^^^^^^^^")
+        print(f"^^^^^^^^^^^^^^^^^^")
+
+
+        total_payoff += int(payoff)
+
+        # total_payoff это сумма всех движенией за месяц, включая выплаты или возвраты за предыдыщуие заказаы и или месяцы
+        # all_payoff это сумма именно заказов внутри месяца, она может быть выше, поскольу не учитывает вычиты с других заказаов, которые не привязаны
+        # к конкретному заказу. в сумме выплат указывается значение total_payoff, но если суммировать все заказы, сумма будет выше, поскольку для каждого заказа не учетны эти расходы
+
+        #print(f'total_payoff {total_payoff}')
+        #print(f"^^^^^^^^^^^^^^^^^^")
+
+        if opt != 0 and opt is not None and sale_price != 0:
             new_entry.update({
                 'quantity': 1,
-                'name': name,
+                'name': posting_number,
                 'product_id': int(sku),
                 'sale_price': int(sale_price),
                 'opt': int(opt),
+                'fees': int(service_fees),
                 'payoff': int(payoff), # к выплате
                 })
             net_profit = int(payoff) - int(opt)
-            net_profit_perc = (net_profit / int(opt)) * 100
             posttax_profit = net_profit - (int(payoff) * 0.06)
+            net_profit_perc = (net_profit / int(opt)) * 100
             posttax_profit_perc = (posttax_profit / int(opt)) * 100
             new_entry.update({
                 'net_profit': int(net_profit),
@@ -466,45 +505,59 @@ def ozon_get_finance(headers: dict, period: str):
                 'posttax_profit_perc': int(posttax_profit_perc),
             })
 
+            if offer_id is not None:
+                if offer_id in result:
+                    result[offer_id].append(new_entry)
+                else:
+                    result[offer_id] = [new_entry]
+            #print(f'result {offer_id} posting_number {posting_number} NEW ENTRY {new_entry}')
 
-        if offer_id in result:
-            result[offer_id].append(new_entry)
-        else:
-            result[offer_id] = [new_entry]
-
-
-
-    #print(f'result ozon price {result}')
+        #print(f'items {items}')
+        #print(f"^^^^^^^^^^^^^^^^^^\n")
+    print(f'total_payoff {total_payoff}')
+    print(f"^^^^^^^^^^^^^^^^^^")
+    #print(json.dumps(result, indent=4, ensure_ascii=False))
     # seller_price_per_instance Цена продавца с учётом скидки.
     # 'item': {'offer_id': 'cer_black_20', 'barcode': 'OZN1249002486', 'sku': 1249002486},
     sorted_report = dict(sorted(result.items(), key=lambda item: (item[0][:3], item[0][3:])))
 
     # Итерация по результатам и вычисление суммы total_price
     for offer_id, entries in result.items():
-        total_price_sum = sum(entry['total_price'] for entry in entries)
+        #print(f'entries {entries}')
+        offer_id_total_payoff = sum(entry['payoff'] for entry in entries)
+        net_profit_sum = sum(entry['net_profit'] for entry in entries)
         net_profit_sum = sum(entry['net_profit'] for entry in entries)
         posttax_profit_sum = sum(entry['posttax_profit'] for entry in entries)
         total_quantity = sum(entry['quantity'] for entry in entries)
 
         # Расчет средней цены продажи
-        average_sales_price = total_price_sum / total_quantity if total_quantity > 0 else 0
+        average_sales_price = payoff / total_quantity if total_quantity > 0 else 0
 
         average_percent_posttax = sum(entry['posttax_profit_perc'] for entry in entries) / len(
             entries) if entries else 0
 
         # Сохраняем результаты в словарь
         summed_totals[offer_id] = {
-            "total_price_sum": int(total_price_sum),
+            "payoff": int(offer_id_total_payoff),
             "net_profit_sum": int(net_profit_sum),
             "posttax_profit_sum": int(posttax_profit_sum),
             "average_sales_price": int(average_sales_price),
             "average_percent_posttax": int(average_percent_posttax),
             "total_quantity": int(total_quantity),
         }
+        #print(json.dumps(entries, indent=4, ensure_ascii=False))
+        #print(f"^^^^^^^^^^^^^^^^^^")
+        #print(json.dumps(summed_totals[offer_id], indent=4, ensure_ascii=False))
+        #print(f"#################")
+        #print(f"#################")
+        #print(f"#################")
+        #print(f"#################")
+        #print(f"#################")
+
     #print(f'summed_totals {summed_totals}')
-    all_total_price_sum = sum(value["total_price_sum"] for value in summed_totals.values())
+    #print(json.dumps(summed_totals, indent=4, ensure_ascii=False))
     all_totals = {
-        "all_total_price_sum": all_total_price_sum,
+        "all_total_price_sum": total_payoff, # выводим именно суммы выплаты, а не сумму всех заказов
         "all_net_profit_sum": sum(value["net_profit_sum"] for value in summed_totals.values()),
         "all_posttax_profit_sum": sum(value["posttax_profit_sum"] for value in summed_totals.values()),
         "all_quantity": sum(value["total_quantity"] for value in summed_totals.values()),
@@ -524,6 +577,7 @@ def ozon_get_finance(headers: dict, period: str):
     morph = pymorphy2.MorphAnalyzer()
     month_nominative = morph.parse(month_name)[0].inflect({'nomn'}).word
     day_delta = stop_date - start_date
+    header_data = {}
     header_data['month'] = month_nominative.capitalize()
     header_data['day_delta'] = day_delta.days
 
@@ -534,6 +588,25 @@ def ozon_get_finance(headers: dict, period: str):
     result['summed_totals'] = summed_totals
     result['header_data'] = header_data
     return result
+
+
+def ozon_get_base_posting_number(posting_number: str) -> str:
+    """
+    Возвращает «базовую» часть номера из первых двух частей, разделённых дефисом.
+    Например:
+    - 74707503-0159       -> 74707503-0159
+    - 74707503-0159-1     -> 74707503-0159
+    - 74707503-0159-other -> 74707503-0159
+    """
+    parts = posting_number.split('-')
+
+    # Если в номере 2 или больше частей, вернём первые две, соединённые дефисом
+    if len(parts) >= 2:
+        return parts[0] + '-' + parts[1]
+
+    # Если по какой-то причине меньше двух частей (например, совсем другой формат),
+    # просто возвращаем исходный номер
+    return posting_number
 
 def ozon_get_all_price(headers):
     opt_price = ms_get_product(headers)
