@@ -85,6 +85,7 @@ def db_check_awaiting_postingnumber(posting_numbers: list):
     return result
 
 def db_create_customerorder(not_found_product: dict, market: str, seller: Seller):
+    # product = {posting_number: {status:'', product_list: [{offer_id: price: quantity:}] }}
     try:
         for posting_number, products in not_found_product.items():
             # Создаем запись в таблице OwmAwaiting
@@ -111,11 +112,29 @@ def db_create_customerorder(not_found_product: dict, market: str, seller: Seller
         print(f"Error occurred: {e}")
         raise
 
-def db_get_awaiting(market: str) -> Dict[str, Any]:
+def db_update_customerorder(posting_number: str, status: str, seller: Seller):
+    try:
+        # Пытаемся найти запись с таким posting_number и продавцом
+        awaiting_record = Awaiting.objects.filter(posting_number=posting_number, seller=seller).first()
+
+        if awaiting_record:
+            # Обновляем только статус
+            awaiting_record.status = status
+            awaiting_record.save()
+            print(f"[OK] Обновлён статус записи posting_number={posting_number} → {status}")
+        else:
+            print(f"[WARN] Запись с posting_number={posting_number} не найдена. Обновление не выполнено.")
+
+    except Exception as e:
+        print(f"[ERROR] При обновлении заказа: {e}")
+        raise
+
+
+def db_get_awaiting(seller: Seller, market: str) -> Dict[str, Any]:
     """
     Извлекает все отпралвения для указанного продавца (seller)
     """
-    records = Awaiting.objects.filter(market=market)
+    records = Awaiting.objects.filter(seller=seller, market=market)
     result = {}
     orders_list = []
     for record in records:

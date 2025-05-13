@@ -15,7 +15,7 @@ from owm.utils.ms_utils import ms_create_customerorder, ms_get_organization_meta
     ms_cancel_order, ms_create_delivering
 from owm.models import Crontab
 from owm.utils.oz_utils import ozon_get_awaiting_fbs, ozon_get_status_fbs
-from owm.utils.wb_utils import wb_get_awaiting_fbs
+from owm.utils.wb_utils import wb_get_status_fbs
 from owm.utils.ya_utils import yandex_get_awaiting_fbs
 
 import logging
@@ -24,7 +24,7 @@ logger_error = logging.getLogger('crm3_error')
 
 def get_headers(seller):
     headers = {}
-    print(f'seller {seller}')
+    #print(f'seller {seller}')
     moysklad_api = seller.moysklad_api
     yandex_api = seller.yandex_api
     wildberries_api = seller.wildberries_api
@@ -436,35 +436,40 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
     """
         OZON
     """
-    cron_active_mp['ozon'] = True
-    cron_active_mp['wb'] = False
+    cron_active_mp['ozon'] = False
+    cron_active_mp['wb'] = True
     cron_active_mp['yandex'] = False
+    ms_update = False
 
     if cron_active_mp['ozon']:
 
         ozon_awaiting_fbs_dict = ozon_get_awaiting_fbs(headers)
         ozon_current_product = ozon_awaiting_fbs_dict['current_product']
 
-        ozon_status_fbs_dict = ozon_get_status_fbs(headers=headers) # получаем статусы с озона и сравниваем в базе, если отличаются меняем на МС
+        ozon_status_fbs_dict = ozon_get_status_fbs(headers=headers) # получаем статусы с озона и сравниваем в базе
 
         if ozon_awaiting_fbs_dict['not_found']:
            not_found_product = {key: product for key in ozon_awaiting_fbs_dict['not_found'] for product in ozon_current_product if key in product.get('posting_number', '')}
            ms_result = ms_create_customerorder(headers=headers, not_found_product=not_found_product, seller=seller, market='ozon')
            if ms_result:
                db_create_customerorder(not_found_product, market='ozon', seller=seller)
-               ms_update_allstock_to_mp(headers=headers, seller=seller)
+               ms_update = True
 
         if ozon_awaiting_fbs_dict['found']:
            found_product = {key: ozon_current_product[key] for key in ozon_awaiting_fbs_dict['found'] if key in ozon_current_product}
            if ozon_status_fbs_dict:
-               #print(f'ТУТ')
-               #print(f'ozon_status_fbs_dict {ozon_status_fbs_dict}')
+               #if ozon_status_fbs_dict['awaiting']:
+                   #print(f"ozon_status_fbs_dict {ozon_status_fbs_dict['awaiting']}")
+                   # вернуть в ozon_get_status_fbs
+                   # if posting_number in existing_orders and existing_orders[posting_number] != status:
+                   #ms_create_delivering(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['awaiting'])
                if ozon_status_fbs_dict['delivering']: # доставлется (отгружено)
+                   # вернуть в ozon_get_status_fbs
+                   # if posting_number in existing_orders and existing_orders[posting_number] != status:
                    ms_create_delivering(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['delivering'])
-                   exit()
-               if ozon_status_fbs_dict['received']:
+               if ozon_status_fbs_dict.get('received'):
                    pass
-               if ozon_status_fbs_dict['cancelled']:
+               if ozon_status_fbs_dict.get('cancelled'):
                    pass
 
            #print(f'*' * 40)
@@ -475,29 +480,51 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
     """
     if cron_active_mp['wb']:
 
-        wb_awaiting_fbs_dict = wb_get_awaiting_fbs(headers)
-        wb_filter_product = wb_awaiting_fbs_dict['filter_product']
+        wb_status_fbs_dict = wb_get_status_fbs(headers) #здесь получаются все статусы
+        wb_filter_product = wb_status_fbs_dict['filter_product']
+
+
 
         #print(f'*' * 40)
-        #print(f'wb_awaiting_fbs_dict {wb_awaiting_fbs_dict}')
+        #print(f'wb_awaiting_fbs_dict {wb_status_fbs_dict}')
         #print(f'*' * 40)
-        #print(f'wb_filter_product {wb_filter_product}')
-        #print(f'*' * 40)
+        print(f'*' * 40)
+        print(f'wb_filter_product {wb_filter_product}')
+        print(f'*' * 40)
+        exit()
 
-        if wb_awaiting_fbs_dict['not_found']:
+        if wb_status_fbs_dict['not_found']:
            #print(f'*' * 40)
-           not_found_product = {key: product for key in wb_awaiting_fbs_dict['not_found'] for product in wb_filter_product if key == product.get('posting_number', '')}
+           not_found_product = {key: product for key in wb_status_fbs_dict['not_found'] for product in wb_filter_product if key == product.get('posting_number', '')}
            #print(f'not_found_product {not_found_product}')
            #print(f'*' * 40)
-           ms_create_customerorder(headers=headers, not_found_product=not_found_product, seller=seller, market='wb')
-           db_create_customerorder(not_found_product, market='wb')
-           ms_update_allstock_to_mp(headers=headers)
-        if wb_awaiting_fbs_dict['found']:
-           found_product = {key: wb_current_product[key] for key in wb_awaiting_fbs_dict['found'] if key in wb_filter_product}
+           ms_result = ms_create_customerorder(headers=headers, not_found_product=not_found_product, seller=seller, market='wb')
+           if ms_result:
+               db_create_customerorder(not_found_product, market='wb', seller=seller)
+               ms_update = True
+
+        if wb_status_fbs_dict['found']:
+           found_product = {key: wb_current_product[key] for key in wb_status_fbs_dict['found'] if key in wb_filter_product}
            #print(f'*' * 40)
-           #print(f'found_product {found_product}')
+           #print(f'found_product {wb_status_fbs_dict}')
            #print(f'*' * 40)
-        #exit()
+           #exit()
+           if wb_awaiting_fbs_dict:
+               #if ozon_status_fbs_dict['awaiting']:
+                   #print(f"ozon_status_fbs_dict {ozon_status_fbs_dict['awaiting']}")
+                   # вернуть в ozon_get_status_fbs
+                   # if posting_number in existing_orders and existing_orders[posting_number] != status:
+                   #ms_create_delivering(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['awaiting'])
+
+               if wb_status_fbs_dict.get('sorted'): # доставлется (отгружено)
+                   # вернуть в ozon_get_status_fbs
+                   # if posting_number in existing_orders and existing_orders[posting_number] != status:
+                   ms_create_delivering(headers=headers, seller=seller, market='wb', orders=wb_status_fbs_dict['sorted'])
+               if wb_status_fbs_dict.get.get('received'):
+                   pass
+               if wb_status_fbs_dict.get.get('cancelled'):
+                   pass
+
 
     """
     YANDEX
@@ -519,15 +546,19 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
                                  key == product.get('posting_number', '')}
             #print(f'not_found_product {not_found_product}')
             #print(f'*' * 40)
-            ms_create_customerorder(headers=headers, not_found_product=not_found_product, seller=seller, market='yandex')
-            db_create_customerorder(not_found_product, market='yandex')
-            ms_update_allstock_to_mp(headers=headers)
+            ms_result = ms_create_customerorder(headers=headers, not_found_product=not_found_product, seller=seller, market='yandex')
+            if ms_result:
+                db_create_customerorder(not_found_product, market='yandex', seller=seller)
+                ms_update = True
         if yandex_awaiting_fbs_dict['found']:
             found_product = {key: yandex_current_product[key] for key in yandex_awaiting_fbs_dict['found'] if key in yandex_filter_product}
             #print(f'*' * 40)
             #print(f'found_product {found_product}')
             #print(f'*' * 40)
-        return ''
+
+    if ms_update:
+        ms_update_allstock_to_mp(headers=headers, seller=seller)
+
 
 
     #customerorder_dict = await ms_check_customerorder(headers)

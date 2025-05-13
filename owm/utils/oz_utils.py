@@ -1,8 +1,12 @@
 import requests
 import datetime
 
+import traceback
+import sys
+
 from dateutil.relativedelta import relativedelta
 
+from owm.models import Seller
 from owm.utils.db_utils import db_check_awaiting_postingnumber, db_get_awaiting
 from owm.utils.ms_utils import ms_get_product
 
@@ -222,7 +226,7 @@ def ozon_get_awaiting_fbs(headers: dict):
     check_result_dict['current_product'] = current_product
     return check_result_dict
 
-def ozon_get_status_fbs(headers: Dict[str, Any]):
+def ozon_get_status_fbs(headers: Dict[str, Any], seller: Seller):
     '''
     получаем последние статусы заказов FBS
     '''
@@ -232,7 +236,7 @@ def ozon_get_status_fbs(headers: Dict[str, Any]):
     current_date_str = current_date.strftime('%Y-%m-%dT%H:%M:%SZ')
     one_week_ago_str = one_week_ago.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-    orders_db = db_get_awaiting(market='ozon')
+    orders_db = db_get_awaiting(seller=seller, market='ozon')
     # Получаем список заказов для 'ozon'
     orders_list = orders_db.get('ozon', [])
     existing_orders = {order['posting_number']: order['status'] for order in orders_list}
@@ -271,9 +275,11 @@ def ozon_get_status_fbs(headers: Dict[str, Any]):
             #print(f"json_orders: {json_orders}")
             #exit()
             #json_orders =
+            matching_orders['awaiting'] = []
             matching_orders['delivering'] = []
             matching_orders['cancelled'] = []
             matching_orders['delivered'] = []
+            awaiting = []
             delivering = []
             delivered = []
             cancelled = []
@@ -294,36 +300,53 @@ def ozon_get_status_fbs(headers: Dict[str, Any]):
                     #if posting_number == '70611105-0207-1':
                     #    print(f"TYT")
                     #    print(f"TYT: {order}")
-                    #print(f"status {status}")
-                    if posting_number in existing_orders and existing_orders[posting_number] != status:
-                        #print(f"status2 {status}")
-                        if 'delivering' in status:
-                            delivering.append({
-                                'posting_number': posting_number,
-                                'status': status,
-                                'substatus': substatus
-                            })
-                        if 'delivered' in status:
-                            delivered.append({
-                                'posting_number': posting_number,
-                                'status': status,
-                                'substatus': substatus
-                            })
-                        if 'cancelled' in status:
-                            #print(f"TYTTTTT CCCCCC")
-                            cancelled.append({
-                                'posting_number': posting_number,
-                                'status': status,
-                                'substatus': substatus
-                            })
+                    #if posting_number in existing_orders:
+                        #print(f"status {status}\n")
+                    #print(f"\n\n")
+                    #print(f"status {status}\n")
+                    #print(f"existing_orders[posting_number] {existing_orders.get(posting_number)}\n")
+                    if posting_number in existing_orders:
+                        existing_status = existing_orders[posting_number]
+                        if existing_status not in status:
+                            if 'awaiting' in status:
+                                awaiting.append({
+                                    'posting_number': posting_number,
+                                    'status': status,
+                                    'substatus': substatus
+                                })
+                            if 'delivering' in status:
+                                delivering.append({
+                                    'posting_number': posting_number,
+                                    'status': status,
+                                    'substatus': substatus
+                                })
+                            if 'delivered' in status:
+                                delivered.append({
+                                    'posting_number': posting_number,
+                                    'status': status,
+                                    'substatus': substatus
+                                })
+                            if 'cancelled' in status:
+                                #print(f"TYTTTTT CCCCCC")
+                                cancelled.append({
+                                    'posting_number': posting_number,
+                                    'status': status,
+                                    'substatus': substatus
+                                })
             except Exception as e:
                 print(f"Error during processing: {e}")
+                exc_type, exc_value, exc_tb = sys.exc_info()
+                tb = traceback.extract_tb(exc_tb)[-1]  # Последний вызов в трассировке
+                filename = tb.filename
+                lineno = tb.lineno
+                print(f"[{type(e).__name__}] {e} (файл: {filename}, строка: {lineno})")
+            matching_orders['awaiting'] = awaiting
             matching_orders['delivering'] = delivering
             matching_orders['delivered'] = delivered
             matching_orders['cancelled'] = cancelled
         else:
             result['error'] = response.text
-            print(f"ozon_get_status_fbs response.text (awaiting): {response.text}")
+            print(f"Error ozon_get_status_fbs response.text (awaiting): {response.text}")
     except Exception as e:
         result['error'] = f"Error in awaiting request: {e}"
     return matching_orders
@@ -419,12 +442,10 @@ def ozon_get_finance(headers: dict, period: str):
 
 
     grouped_data = defaultdict(list)
-    #print(json.dumps(data_list, indent=4, ensure_ascii=False))
-    # Сначала создаём временный словарь для хранения всех posting_number
     for entry in all_operations:
         raw_pn = entry['posting'].get('posting_number', 'unknown')
-        base_pn = ozon_get_base_posting_number(raw_pn)
-        grouped_data[base_pn].append(entry)
+        #base_pn = ozon_get_base_posting_number(raw_pn)
+        grouped_data[raw_pn].append(entry)
 
     grouped_data = dict(grouped_data)
 
@@ -588,7 +609,6 @@ def ozon_get_finance(headers: dict, period: str):
     result['summed_totals'] = summed_totals
     result['header_data'] = header_data
     return result
-
 
 def ozon_get_base_posting_number(posting_number: str) -> str:
     """

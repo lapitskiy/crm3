@@ -2,7 +2,7 @@
 
 
 import requests
-
+import inspect
 import copy
 
 from typing import Any, Dict, List
@@ -12,7 +12,7 @@ from collections import OrderedDict
 from django.db import models
 
 
-from owm.utils.db_utils import db_get_metadata
+from owm.utils.db_utils import db_get_metadata, db_update_customerorder
 
 import logging
 logger_info = logging.getLogger('crm3_info')
@@ -416,16 +416,22 @@ def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: 
 
     result = {}
 
-    mapping = {
+    db_mapping = {
         'ozon': {'storage': 'ms_storage_ozon', 'agent': 'ms_ozon_contragent', 'status': 'ms_status_shipped'},
         'wb': {'storage': 'ms_storage_wb', 'agent': 'ms_wb_contragent', 'status': 'ms_status_shipped'},
         'yandex': {'storage': 'ms_storage_yandex', 'agent': 'ms_yandex_contragent', 'status': 'ms_status_shipped'}}
+
+    mp_mapping = {
+        'ozon': {'delivering': 'delivering'},
+        'wb': {'delivering': 'sorted'},
+        'yandex': {'delivering': 'sorted'}}
 
     moysklad_headers = headers.get('moysklad_headers')
     metadata = db_get_metadata(seller)
 
 
-    url = 'https://api.moysklad.ru/api/remap/1.2/entity/demand'
+    url_demand = 'https://api.moysklad.ru/api/remap/1.2/entity/demand'
+    url_tempalate = 'https://api.moysklad.ru/api/remap/1.2/entity/demand/new'
 
 
     organization_meta = {
@@ -436,78 +442,88 @@ def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: 
     }
 
     agent_meta = {
-        "href": f"https://api.moysklad.ru/api/remap/1.2/entity/counterparty/{metadata[mapping[market]['agent']]['id']}",
+        "href": f"https://api.moysklad.ru/api/remap/1.2/entity/counterparty/{metadata[db_mapping[market]['agent']]['id']}",
         "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/metadata",
         "type": "counterparty",
         "mediaType": "application/json"
     }
 
     storage_meta = {
-        "href": f"https://api.moysklad.ru/api/remap/1.2/entity/store/{metadata[mapping[market]['storage']]['id']}",
+        "href": f"https://api.moysklad.ru/api/remap/1.2/entity/store/{metadata[db_mapping[market]['storage']]['id']}",
         "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/counterparty/metadata",
         "type": "store",
         "mediaType": "application/json"
     }
 
-    status_meta = {
-        "href": f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/metadata/states/{metadata[mapping[market]['status']]['id']}",
-        "type": "state",
-        "mediaType": "application/json"
-    }
-
-    data = []
+    #status_meta = {
+    #    "href": f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/metadata/states/{metadata[mapping[market]['status']]['id']}",
+    #    "type": "state",
+    #    "mediaType": "application/json"
+    #}
 
     for order in orders:
-        print(f"TYT {ms_orders_dict[order['posting_number']]}")
+        print(f"[ms_utils {inspect.currentframe().f_lineno}][ms_create_delivering][{market}] {order['posting_number']} - {ms_orders_dict[order['posting_number']]}")
+        print(f"posting number {order['posting_number']}")
         order_data = {
-            "name": str(order['posting_number']),
-            "vatEnabled": False,
-            "applicable": True,
-            "state": {
-                "meta": status_meta
-            },
-            "organization": {
-                "meta": organization_meta
-            },
-            "agent": {
-                "meta": agent_meta
-            },
-            "store": {
-                "meta": storage_meta
-            },
             "customerOrder": {
                 "meta": {
                   "href": f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/{ms_orders_dict[order['posting_number']]}",
+                  "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/customerorder/metadata",
                   "type": "customerorder",
                   "mediaType": "application/json"
                 }
             },
-
-
-
-
         }
         # Добавляем сформированный заказ в общий список
-        data.append(order_data)
-        break
-    try:
-        response = requests.post(url, headers=moysklad_headers, json=data)
-        #logging.info(f"[seller {seller.id}][ms_create_customerorder][response json]: {response.json()}")
-        #print(f"*" * 40)
-        print(f"*" * 40)
-        print(f"response_json ms_delivering_order: {response.json()}")
-        print(f"*" * 40)
-        exit()
-        #print(f"*" * 40)
-    except requests.exceptions.JSONDecodeError:
-        logging.error(f"[seller {seller.id}][ms_create_customerorder][response text]: {response.text}")
+        try:
+            response = requests.put(url_tempalate, headers=moysklad_headers, json=order_data)
+            demand_template = response.json()
+            demand_template['name'] = order['posting_number']
+            response = requests.post(url_demand, headers=moysklad_headers, json=demand_template)
 
-    # Дополнительные шаги для обработки результата
-    if response.status_code != 200:
-        print(f"Ошибка: сервер вернул код состояния {response.status_code}")
-    else:
-        # Продолжайте обработку response_json здесь
-        pass
+            #logging.info(f"[seller {seller.id}][ms_create_customerorder][response json]: {response.json()}")
+            #print(f"*" * 40)
+            #print(f"response_json ms_delivering_order: {response.json()}")
+            #print(f"*" * 40)
+        except requests.exceptions.JSONDecodeError:
+            logging.error(f"[seller {seller.id}][ms_create_customerorder][response text]: {response.text}")
+        # Дополнительные шаги для обработки результата
+        if response.status_code != 200:
+            print(f"[ms_utils {inspect.currentframe().f_lineno}] Ошибка: сервер вернул код состояния {response.status_code}\n {response.text}")
+            error = response.json()
+            code = (
+                error.get('errors', [{}])[0].get('code')
+                if isinstance(error.get('errors'), list) and error.get('errors')
+                else None
+            )
+            if code == 3006:
+                db_update_customerorder(order['posting_number'], mp_mapping[market]['delivering'], seller)
+        else:
+
+            db_update_customerorder(order['posting_number'], mp_mapping[market]['delivering'], seller)
+
+            url_status = f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/{ms_orders_dict[order['posting_number']]}"
+            status_meta = {
+                "href": f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/metadata/states/{metadata[db_mapping[market]['status']]['id']}",
+                "type": "state",
+                "mediaType": "application/json"
+            }
+            update_data = {
+                "state": {
+                    "meta": status_meta
+                },
+            }
+            try:
+                # меняем статус после добавления отгрузки
+                response = requests.put(url_status, headers=moysklad_headers, json=update_data)
+            except requests.exceptions.JSONDecodeError:
+                logging.error(f"[seller {seller.id}][ms_create_customerorder][response text]: {response.text}")
+            if response.status_code != 200:
+                print(f">>>[ms_create_delivering][update_data status] - Сервер вернул код состояния {response.status_code}")
+                print(f">>>[ms_create_delivering][update_data status] - Ошибка: {response.text}")
+                print(f">>>[ms_create_delivering][update_data status] - Metadata: {metadata[db_mapping[market]['status']]['id']}")
+            else:
+                pass
     return result
 
 
@@ -544,7 +560,9 @@ def ms_get_all_stock(headers, metadata):
     for stock in response['rows']:
         try:
             stock_tuple[stock['article']] = {
-                'stock': int(stock['stock']),
+                'stock': int(stock['stock']) - int(stock['reserve']),
+                'stock_clear': int(stock['stock']),
+                'reserve': int(stock['reserve']),
                 'price': stock['salePrice'] / 100
             }
         except KeyError as e:

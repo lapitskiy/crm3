@@ -393,7 +393,7 @@ header_data {{ header_data }}
                                         <div class="flex-grow-1 me-5">
                                             <!--begin::Time-->
                                             <div class="text-gray-800 fw-semibold fs-2">
-                                                Зачислена выплата за {{ entry.quantity }} товар {{ entry.name }}: <u>{{ entry.total_price }}</u>
+                                                Зачислена выплата за {{ entry.quantity }} товар <a target="_blank" href="https://seller.ozon.ru/app/finances/accruals?tab=ACCRUALS_DETAILS&search={{ entry.name }}">{{ entry.name }}</a>: <u>{{ entry.total_price }}</u>
                                                 <span class="text-gray-500 fw-semibold fs-7">
                                                 <i class="fas fa-question-circle" data-toggle="tooltip" title="Окончательная сумма зачисления за продажу товара за вычетом всех коммисий ozona"></i></span>
                                             </div>

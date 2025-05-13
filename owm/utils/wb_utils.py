@@ -3,7 +3,7 @@ import logging
 
 import datetime
 
-from owm.utils.db_utils import db_check_awaiting_postingnumber
+from owm.utils.db_utils import db_check_awaiting_postingnumber, db_get_awaiting
 from owm.utils.ms_utils import ms_get_product
 
 logger_info = logging.getLogger('crm3_info')
@@ -111,7 +111,7 @@ def wb_update_inventory(headers, stock):
         logging.exception("Непредвиденная ошибка:")
         return {'code': 500, 'json': f"Непредвиденная ошибка: {e}"}
 
-def wb_get_awaiting_fbs(headers: dict):
+def wb_get_status_fbs(headers: dict):
     '''
     получаем последние отгрузки FBS (отправления)
     '''
@@ -168,40 +168,67 @@ def wb_get_awaiting_fbs(headers: dict):
     try:
         response = requests.post(url_status_awaiting, headers=wb_headers, json=all_status)
         if response.status_code == 200:
-            status_awaiting = response.json()
+            status = response.json()
             #print(f"response_json status: {status_awaiting}")
         else:
             result['error'] = response.text
     except Exception as e:
         result['error'] = f"Error in packag request: {e}"
 
-    waiting_ids = [order['id'] for order in status_awaiting['orders'] if order['wbStatus'] == 'waiting']
+    #waiting_ids = [order['id'] for order in status['orders'] if order['wbStatus'] == 'waiting']
+    #sorted_ids = [order['id'] for order in status['orders'] if order['wbStatus'] == 'sorted'] #delivering?
 
-    filtered_orders = {"orders": [order for order in all_orders['orders'] if order['id'] in waiting_ids]}
+    #filtered_orders['waiting'] = {"orders": [order for order in all_orders['orders'] if order['id'] in waiting_ids]}
+    #filtered_orders['sorted'] = {"orders": [order for order in all_orders['orders'] if order['id'] in sorted_ids]}
+
+    status_map = {order['id']: order['wbStatus'] for order in status['orders']}
+    filtered_status_map = {"waiting": [], "sorted": []}
+
+    for order in all_orders['orders']:
+        wb_status = status_map.get(order['id'])
+        if wb_status in filtered_status_map:
+            filtered_status_map[wb_status].append(order)
 
     filtered_result = []
     #print(f'%' * 40)
     #print(f"filtered_orders {filtered_orders}")
     #print(f"awaiting {waiting_ids}")
     #print(f'%' * 40)
-    for order in filtered_orders['orders']:
-        product_list = []
-        #print(f"Posting Number: {posting_number}")
-        # "sku": 1728663479,
-        product_list.append({
-            "offer_id": order['article'],
-            "price": order['price']/100,
-            "quantity": 1
-            })
-        filtered_result.append(
-            {'posting_number': order['id'],
-             'status': 'waiting',
-             'product_list': product_list
-             })
+    filtered_result = {"waiting": [], "sorted": []}
 
-    check_result_dict = db_check_awaiting_postingnumber(waiting_ids)
-    check_result_dict['filter_product'] = filtered_result
-    return check_result_dict
+    for status in ("waiting", "sorted"):
+        for order in filtered_status_map[status]:
+            product_list = [{
+                "offer_id": order["article"],
+                "price": order["price"] / 100,
+                "quantity": 1
+            }]
+            filtered_result[status].append({
+                "posting_number": order["id"],
+                "status": status,
+                "product_list": product_list
+            })
+
+
+
+    posting_numbers = [
+        item['id']
+        for status in ("waiting", "sorted")
+        for item in filtered_status_map[status]
+    ]
+
+    #print(f'%' * 40)
+    #print(f"filtered_status_map {filtered_status_map['waiting']}")
+    #print(f'%' * 40)
+
+    result = db_check_awaiting_postingnumber(posting_numbers) # key: found, not_found
+    #print(f'%' * 40)
+    #print(f"check_result_dict {result}")
+    #print(f'%' * 40)
+    result['filter_product'] = filtered_result
+    return result
+
+
 
 def wb_get_products(headers):
     url_list = "https://content-api.wildberries.ru/content/v2/get/cards/list"
