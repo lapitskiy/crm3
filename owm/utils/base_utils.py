@@ -10,7 +10,7 @@ from django.conf import settings
 
 import pandas as pd
 
-from owm.utils.db_utils import db_get_metadata, db_create_customerorder, db_get_awaiting
+from owm.utils.db_utils import db_get_metadata, db_create_customerorder, db_get_status
 from owm.utils.ms_utils import ms_create_customerorder, ms_get_organization_meta, ms_get_agent_meta, ms_update_allstock_to_mp, \
     ms_cancel_order, ms_create_delivering
 from owm.models import Crontab
@@ -446,7 +446,7 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
         ozon_awaiting_fbs_dict = ozon_get_awaiting_fbs(headers)
         ozon_current_product = ozon_awaiting_fbs_dict['current_product']
 
-        ozon_status_fbs_dict = ozon_get_status_fbs(headers=headers) # получаем статусы с озона и сравниваем в базе
+        ozon_status_fbs_dict = ozon_get_status_fbs(headers=headers, seller=seller) # получаем статусы с озона и сравниваем в базе
 
         if ozon_awaiting_fbs_dict['not_found']:
            not_found_product = {key: product for key in ozon_awaiting_fbs_dict['not_found'] for product in ozon_current_product if key in product.get('posting_number', '')}
@@ -456,7 +456,7 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
                ms_update = True
 
         if ozon_awaiting_fbs_dict['found']:
-           found_product = {key: ozon_current_product[key] for key in ozon_awaiting_fbs_dict['found'] if key in ozon_current_product}
+           #found_product = {key: ozon_current_product[key] for key in ozon_awaiting_fbs_dict['found'] if key in ozon_current_product}
            if ozon_status_fbs_dict:
                #if ozon_status_fbs_dict['awaiting']:
                    #print(f"ozon_status_fbs_dict {ozon_status_fbs_dict['awaiting']}")
@@ -480,22 +480,24 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
     """
     if cron_active_mp['wb']:
 
-        wb_status_fbs_dict = wb_get_status_fbs(headers) #здесь получаются все статусы
-        wb_filter_product = wb_status_fbs_dict['filter_product']
-
-
+        wb_fbs_dict = wb_get_status_fbs(headers=headers, seller=seller) #здесь получаются все статусы
+        wb_found_product = wb_fbs_dict['found']
+        wb_notfound_product = wb_fbs_dict['not_found']
+        wb_all_status = wb_fbs_dict['filter_product']
+        wb_waiting_product = wb_all_status['waiting']
+        wb_sorted_product = wb_all_status['sorted']
 
         #print(f'*' * 40)
         #print(f'wb_awaiting_fbs_dict {wb_status_fbs_dict}')
         #print(f'*' * 40)
-        print(f'*' * 40)
-        print(f'wb_filter_product {wb_filter_product}')
-        print(f'*' * 40)
-        exit()
+        #print(f'*' * 40)
+        #print(f'wb_filter_product {wb_filter_product}')
+        #print(f'*' * 40)
+        #exit()
 
-        if wb_status_fbs_dict['not_found']:
+        if wb_notfound_product:
            #print(f'*' * 40)
-           not_found_product = {key: product for key in wb_status_fbs_dict['not_found'] for product in wb_filter_product if key == product.get('posting_number', '')}
+           not_found_product = {key: product for key in wb_notfound_product for product in wb_waiting_product if key == product.get('posting_number', '')}
            #print(f'not_found_product {not_found_product}')
            #print(f'*' * 40)
            ms_result = ms_create_customerorder(headers=headers, not_found_product=not_found_product, seller=seller, market='wb')
@@ -503,26 +505,19 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
                db_create_customerorder(not_found_product, market='wb', seller=seller)
                ms_update = True
 
-        if wb_status_fbs_dict['found']:
-           found_product = {key: wb_current_product[key] for key in wb_status_fbs_dict['found'] if key in wb_filter_product}
+        if wb_found_product:
+           #found_product = {key: wb_current_product[key] for key in wb_status_fbs_dict['found'] if key in wb_filter_product}
+
            #print(f'*' * 40)
            #print(f'found_product {wb_status_fbs_dict}')
            #print(f'*' * 40)
            #exit()
-           if wb_awaiting_fbs_dict:
-               #if ozon_status_fbs_dict['awaiting']:
-                   #print(f"ozon_status_fbs_dict {ozon_status_fbs_dict['awaiting']}")
-                   # вернуть в ozon_get_status_fbs
-                   # if posting_number in existing_orders and existing_orders[posting_number] != status:
-                   #ms_create_delivering(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['awaiting'])
-
-               if wb_status_fbs_dict.get('sorted'): # доставлется (отгружено)
-                   # вернуть в ozon_get_status_fbs
-                   # if posting_number in existing_orders and existing_orders[posting_number] != status:
-                   ms_create_delivering(headers=headers, seller=seller, market='wb', orders=wb_status_fbs_dict['sorted'])
-               if wb_status_fbs_dict.get.get('received'):
+           if wb_all_status:
+               if wb_all_status.get('sorted'): # доставлется (отгружено)
+                   ms_create_delivering(headers=headers, seller=seller, market='wb', orders=wb_sorted_product)
+               if wb_all_status.get('received'):
                    pass
-               if wb_status_fbs_dict.get.get('cancelled'):
+               if wb_all_status.get('cancelled'):
                    pass
 
 

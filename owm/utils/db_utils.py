@@ -130,7 +130,7 @@ def db_update_customerorder(posting_number: str, status: str, seller: Seller):
         raise
 
 
-def db_get_awaiting(seller: Seller, market: str) -> Dict[str, Any]:
+def db_get_status(seller: Seller, market: str) -> Dict[str, Any]:
     """
     Извлекает все отпралвения для указанного продавца (seller)
     """

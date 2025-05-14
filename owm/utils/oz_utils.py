@@ -7,7 +7,7 @@ import sys
 from dateutil.relativedelta import relativedelta
 
 from owm.models import Seller
-from owm.utils.db_utils import db_check_awaiting_postingnumber, db_get_awaiting
+from owm.utils.db_utils import db_check_awaiting_postingnumber, db_get_status
 from owm.utils.ms_utils import ms_get_product
 
 import locale
@@ -236,7 +236,7 @@ def ozon_get_status_fbs(headers: Dict[str, Any], seller: Seller):
     current_date_str = current_date.strftime('%Y-%m-%dT%H:%M:%SZ')
     one_week_ago_str = one_week_ago.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-    orders_db = db_get_awaiting(seller=seller, market='ozon')
+    orders_db = db_get_status(seller=seller, market='ozon')
     # Получаем список заказов для 'ozon'
     orders_list = orders_db.get('ozon', [])
     existing_orders = {order['posting_number']: order['status'] for order in orders_list}

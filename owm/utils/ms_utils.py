@@ -462,8 +462,8 @@ def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: 
     #}
 
     for order in orders:
-        print(f"[ms_utils {inspect.currentframe().f_lineno}][ms_create_delivering][{market}] {order['posting_number']} - {ms_orders_dict[order['posting_number']]}")
         print(f"posting number {order['posting_number']}")
+        print(f"[ms_utils {inspect.currentframe().f_lineno}][ms_create_delivering][{market}] {order['posting_number']} - {ms_orders_dict[order['posting_number']]}")
         order_data = {
             "customerOrder": {
                 "meta": {

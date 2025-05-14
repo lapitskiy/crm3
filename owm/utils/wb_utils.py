@@ -3,7 +3,8 @@ import logging
 
 import datetime
 
-from owm.utils.db_utils import db_check_awaiting_postingnumber, db_get_awaiting
+from owm.models import Seller
+from owm.utils.db_utils import db_check_awaiting_postingnumber, db_get_status
 from owm.utils.ms_utils import ms_get_product
 
 logger_info = logging.getLogger('crm3_info')
@@ -111,11 +112,16 @@ def wb_update_inventory(headers, stock):
         logging.exception("Непредвиденная ошибка:")
         return {'code': 500, 'json': f"Непредвиденная ошибка: {e}"}
 
-def wb_get_status_fbs(headers: dict):
+def wb_get_status_fbs(headers: dict, seller: Seller):
     '''
     получаем последние отгрузки FBS (отправления)
     '''
-    result = {}
+
+
+    orders_db = db_get_status(seller=seller, market='wb')
+    # Получаем список заказов для 'ozon'
+    orders_list = orders_db.get('ozon', [])
+    existing_orders = {order['posting_number']: order['status'] for order in orders_list}
 
     current_date = datetime.datetime.now()
 
@@ -198,16 +204,21 @@ def wb_get_status_fbs(headers: dict):
 
     for status in ("waiting", "sorted"):
         for order in filtered_status_map[status]:
-            product_list = [{
-                "offer_id": order["article"],
-                "price": order["price"] / 100,
-                "quantity": 1
-            }]
-            filtered_result[status].append({
-                "posting_number": order["id"],
-                "status": status,
-                "product_list": product_list
-            })
+            posting_number = order["id"]
+            status =status
+            if posting_number in existing_orders:
+                existing_status = existing_orders[posting_number]
+                if existing_status != status:
+                    product_list = [{
+                        "offer_id": order["article"],
+                        "price": order["price"] / 100,
+                        "quantity": 1
+                    }]
+                    filtered_result[status].append({
+                        "posting_number": order["id"],
+                        "status": status,
+                        "product_list": product_list
+                    })
 
 
 
@@ -216,11 +227,11 @@ def wb_get_status_fbs(headers: dict):
         for status in ("waiting", "sorted")
         for item in filtered_status_map[status]
     ]
-
     #print(f'%' * 40)
     #print(f"filtered_status_map {filtered_status_map['waiting']}")
     #print(f'%' * 40)
 
+    result = {}
     result = db_check_awaiting_postingnumber(posting_numbers) # key: found, not_found
     #print(f'%' * 40)
     #print(f"check_result_dict {result}")
