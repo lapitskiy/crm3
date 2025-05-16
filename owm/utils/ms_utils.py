@@ -252,7 +252,6 @@ def ms_cancel_order(headers: Dict[str, Any], posting_number: str):
 
 def ms_create_customerorder(headers: dict, not_found_product: dict, seller: models.Model, market: str):
     result = False
-
     mapping = {
             'ozon': {'storage': 'ms_storage_ozon', 'agent': 'ms_ozon_contragent', 'status': 'ms_status_awaiting'},
             'wb': {'storage': 'ms_storage_wb', 'agent': 'ms_wb_contragent', 'status': 'ms_status_awaiting'},
@@ -270,6 +269,8 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
             article = item.get('article')
             if article:
                 article_to_id[article] = item['id']
+
+        print(f"not_found_product: {not_found_product}")
 
         orders = copy.deepcopy(not_found_product)  # чтобы избежать изменения исходного
 
@@ -333,6 +334,7 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
 
         data = []
         # Формирование списка заказов
+
         for key, order in orders.items():
             order_data = {
                 "name": str(order['posting_number']),
@@ -387,16 +389,18 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
             #logging.info(f"[seller {seller.id}][ms_create_customerorder][response json]: {response.json()}")
             #print(f"*" * 40)
             #print(f"*" * 40)
-            #print(f"response_json MS: {response.json()}")
+            print(f"response_json MS: {data}")
             #print(f"*" * 40)
             #print(f"*" * 40)
         except requests.exceptions.JSONDecodeError:
+            print(f"[seller {seller.id}][ms_create_customerorder][response text]: {response.text}")
             logging.error(f"[seller {seller.id}][ms_create_customerorder][response text]: {response.text}")
 
         # Дополнительные шаги для обработки результата
         if response.status_code != 200:
-            return False
+            print(f"[seller {seller.id}][ms_create_customerorder][response text]: {response.text}")
             print(f"Ошибка: сервер вернул код состояния {response.status_code}")
+            return False
         else:
             return True
     else:
