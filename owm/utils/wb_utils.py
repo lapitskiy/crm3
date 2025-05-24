@@ -116,7 +116,7 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
     '''
     получаем последние отгрузки FBS (отправления)
     '''
-
+    result = {}
 
     orders_db = db_get_status(seller=seller, market='wb')
     # Получаем список заказов для 'ozon'
@@ -160,14 +160,21 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
     except Exception as e:
         result['error'] = f"Error in awaiting request: {e}"
 
+    db_wb_status = db_get_status(seller=seller, market='wb', exclude_status='sold')
 
+    db_ids = [order["posting_number"] for order in db_wb_status.get("wb", [])]
 
     all_status = {
         "orders": [order["id"] for order in all_orders["orders"]]
     }
 
-    # article string Артикул продавца
-    #nmId	integer Артикул wB
+    new_ids = [int(oid) for oid in db_ids if int(oid) not in all_status["orders"]]
+
+    all_status["orders"] = (new_ids + all_status["orders"])[:1000]
+
+    #print(f'Z' * 40)
+    #print(f"db_wb_status: {db_ids}")
+    #print(f'Z' * 40)
 
     url_status_awaiting = 'https://marketplace-api.wildberries.ru/api/v3/orders/status'
 
@@ -177,9 +184,13 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
             status = response.json()
             #print(f"response_json status: {status_awaiting}")
         else:
+            print(f"response_json status: {response.text}")
             result['error'] = response.text
+            return result
     except Exception as e:
+        print(f"response_json status: {response.text}")
         result['error'] = f"Error in packag request: {e}"
+        return result
 
     #waiting_ids = [order['id'] for order in status['orders'] if order['wbStatus'] == 'waiting']
     #sorted_ids = [order['id'] for order in status['orders'] if order['wbStatus'] == 'sorted'] #delivering?
@@ -187,44 +198,89 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
     #filtered_orders['waiting'] = {"orders": [order for order in all_orders['orders'] if order['id'] in waiting_ids]}
     #filtered_orders['sorted'] = {"orders": [order for order in all_orders['orders'] if order['id'] in sorted_ids]}
 
+    #print(f'%' * 40)
+    #print(f"status {status}")
+    #print(f"awaiting {waiting_ids}")
+    #print(f'%' * 40)
+
+
+
+
     status_map = {order['id']: order['wbStatus'] for order in status['orders']}
-    filtered_status_map = {"waiting": [], "sorted": []}
+    #print(f'%' * 40)
+    #print(f"status_map {status_map}")
+    #print(f"awaiting {waiting_ids}")
+    #print(f'%' * 40)
+
+    filtered_status_map = {"waiting": [], "sorted": [], "sold": [], "canceled": []}
+
+    status_list = ("waiting", "sorted", "sold", "canceled")
+
+    # Маппинг исходных статусов к финальным ключам
+    status_aliases = {
+        "canceled": "canceled",
+        "canceled_by_client": "canceled",
+        "declined_by_client": "canceled",
+        "waiting": "waiting",
+        "sorted": "sorted",
+        "sold": "sold",
+    }
 
     for order in all_orders['orders']:
         wb_status = status_map.get(order['id'])
+        mapped_status = status_aliases.get(wb_status)
         if wb_status in filtered_status_map:
-            filtered_status_map[wb_status].append(order)
+            filtered_status_map[mapped_status].append(order)
 
-    filtered_result = []
+    filtered_result = {"waiting": [], "sorted": [], "sold": [], "canceled": []}
     #print(f'%' * 40)
-    #print(f"filtered_orders {filtered_orders}")
+    #print(f"filtered_status_map {filtered_status_map}")
     #print(f"awaiting {waiting_ids}")
     #print(f'%' * 40)
-    filtered_result = {"waiting": [], "sorted": []}
 
-    for status in ("waiting", "sorted"):
+    for status in status_list:
         for order in filtered_status_map[status]:
             posting_number = order["id"]
-            status =status
+            status = status
             if posting_number in existing_orders:
+                #print(f'{posting_number}')
                 existing_status = existing_orders[posting_number]
                 if existing_status != status:
                     product_list = [{
                         "offer_id": order["article"],
-                        "price": order["price"] / 100,
+                        "price": int(order["price"]) / 100,
                         "quantity": 1
                     }]
+                    print(f'{order["price"]}')
+                    print(f'{product_list}\n\n')
+                    filtered_result[status].append({
+                        "posting_number": order["id"],
+                        "status": status,
+                        "product_list": product_list
+                    })
+            else:
+                if status == 'waiting':
+                    product_list = [{
+                        "offer_id": order["article"],
+                        "price": int(order["price"]) / 100,
+                        "quantity": 1
+                    }]
+                    print(f'{order["price"]}')
+                    print(f'{product_list}\n\n')
                     filtered_result[status].append({
                         "posting_number": order["id"],
                         "status": status,
                         "product_list": product_list
                     })
 
-
+    #print(f'%' * 40)
+    #print(f"filtered_result - {filtered_result}")
+    #print(f"awaiting {waiting_ids}")
+    #print(f'%' * 40)
 
     posting_numbers = [
         item['id']
-        for status in ("waiting", "sorted")
+        for status in status_list
         for item in filtered_status_map[status]
     ]
     #print(f'%' * 40)
@@ -232,6 +288,11 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
     #print(f'%' * 40)
 
     result = {}
+
+    #print(f'%' * 40)
+    #print(f"posting_numbers {posting_numbers}")
+    #print(f'%' * 40)
+
     result = db_check_awaiting_postingnumber(posting_numbers) # key: found, not_found
     #print(f'%' * 40)
     #print(f"check_result_dict {result}")

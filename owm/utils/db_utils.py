@@ -130,11 +130,22 @@ def db_update_customerorder(posting_number: str, status: str, seller: Seller):
         raise
 
 
-def db_get_status(seller: Seller, market: str) -> Dict[str, Any]:
+def db_get_status(seller: Seller, market: str, exclude_status: str = None) -> Dict[str, Any]:
     """
     Извлекает все отпралвения для указанного продавца (seller)
     """
-    records = Awaiting.objects.filter(seller=seller, market=market)
+
+    if exclude_status:
+        records = Awaiting.objects.filter(
+            seller=seller,
+            market=market
+        ).exclude(status=exclude_status)
+    else:
+        records = Awaiting.objects.filter(
+            seller=seller,
+            market=market
+        )
+
     result = {}
     orders_list = []
     for record in records:

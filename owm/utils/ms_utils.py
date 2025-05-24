@@ -270,8 +270,6 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
             if article:
                 article_to_id[article] = item['id']
 
-        print(f"not_found_product: {not_found_product}")
-
         orders = copy.deepcopy(not_found_product)  # чтобы избежать изменения исходного
 
         # Создаём список ключей заказов, которые нужно удалить
