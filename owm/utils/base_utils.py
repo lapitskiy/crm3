@@ -490,9 +490,9 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
             wb_notfound_product = wb_fbs_dict['not_found']
             wb_all_status = wb_fbs_dict['filter_product']
             wb_waiting_product = wb_all_status['waiting']
-            print(f'1' * 40)
-            print(f'wb_waiting_product {wb_waiting_product}')
-            print(f'1' * 40)
+            #print(f'1' * 40)
+            #print(f'wb_found_product {wb_found_product}')
+            #print(f'1' * 40)
             wb_sorted_product = wb_all_status['sorted']
 
             if wb_notfound_product:
@@ -500,24 +500,25 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
                not_found_product = {key: product for key in wb_notfound_product for product in wb_waiting_product if key == product.get('posting_number', '')}
                #print(f'*' * 40)
                if not_found_product:
-                   print(f'2' * 40)
-                   print(f'not_found_product {not_found_product}')
-                   print(f'2' * 40)
-                   exit()
+                   #print(f'2' * 40)
+                   #print(f'not_found_product {not_found_product}')
+                   #print(f'2' * 40)
                    ms_result = ms_create_customerorder(headers=headers, not_found_product=not_found_product, seller=seller, market='wb')
                    if ms_result:
                        db_create_customerorder(not_found_product, market='wb', seller=seller)
                        ms_update = True
-
             if wb_found_product:
                #found_product = {key: wb_current_product[key] for key in wb_status_fbs_dict['found'] if key in wb_filter_product}
 
                #print(f'*' * 40)
-               #print(f'wb_sorted_product {wb_sorted_product}')
+               #print(f'wb_found_product {wb_found_product}')
                #print(f'*' * 40)
-               #exit()
+               print('tyt')
                if wb_all_status:
+                   print(f'wb_all_status {wb_all_status}')
                    if wb_all_status.get('sorted'): # доставлется (отгружено)
+                       print('tyt3')
+                       exit()
                        ms_create_delivering(headers=headers, seller=seller, market='wb', orders=wb_sorted_product)
                    if wb_all_status.get('sold'):
                        pass

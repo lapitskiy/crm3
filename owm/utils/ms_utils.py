@@ -387,7 +387,7 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
             #logging.info(f"[seller {seller.id}][ms_create_customerorder][response json]: {response.json()}")
             #print(f"*" * 40)
             #print(f"*" * 40)
-            print(f"response_json MS: {data}")
+            #print(f"response_json MS: {data}")
             #print(f"*" * 40)
             #print(f"*" * 40)
         except requests.exceptions.JSONDecodeError:
