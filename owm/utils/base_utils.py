@@ -518,7 +518,6 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
                    print(f'wb_all_status {wb_all_status}')
                    if wb_all_status.get('sorted'): # доставлется (отгружено)
                        print('tyt3')
-                       exit()
                        ms_create_delivering(headers=headers, seller=seller, market='wb', orders=wb_sorted_product)
                    if wb_all_status.get('sold'):
                        pass
