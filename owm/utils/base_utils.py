@@ -5,22 +5,27 @@ import datetime
 import uuid
 import xlsxwriter
 
+#TEST
+
 import os
 from django.conf import settings
 
 import pandas as pd
 
-from owm.utils.db_utils import db_get_metadata, db_create_customerorder, db_get_status
+from owm.utils.db_utils import db_get_metadata, db_create_customerorder, db_get_status, redis_lock
 from owm.utils.ms_utils import ms_create_customerorder, ms_get_organization_meta, ms_get_agent_meta, ms_update_allstock_to_mp, \
-    ms_cancel_order, ms_create_delivering
+    ms_cancel_order, ms_create_delivering, ms_create_sold, ms_create_canceled
 from owm.models import Crontab
 from owm.utils.oz_utils import ozon_get_awaiting_fbs, ozon_get_status_fbs
 from owm.utils.wb_utils import wb_get_status_fbs
 from owm.utils.ya_utils import yandex_get_awaiting_fbs
 
 import logging
+
+
 logger_info = logging.getLogger('crm3_info')
 logger_error = logging.getLogger('crm3_error')
+
 
 def get_headers(seller):
     headers = {}
@@ -88,7 +93,6 @@ def get_headers(seller):
         }
     time.sleep(1)
     return headers
-
 
 
 def get_store_meta(headers):
@@ -444,11 +448,15 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
     if cron_active_mp['ozon']:
 
         ozon_awaiting_fbs_dict = ozon_get_awaiting_fbs(headers)
+        
+        ozon_found_product = ozon_awaiting_fbs_dict['found']
+        ozon_notfound_product = ozon_awaiting_fbs_dict['not_found']
+        
         ozon_current_product = ozon_awaiting_fbs_dict['current_product']
 
         ozon_status_fbs_dict = ozon_get_status_fbs(headers=headers, seller=seller) # получаем статусы с озона и сравниваем в базе
 
-        if ozon_awaiting_fbs_dict['not_found']:
+        if ozon_notfound_product:
            not_found_product = {key: product for key in ozon_awaiting_fbs_dict['not_found'] for product in ozon_current_product if key in product.get('posting_number', '')}
            ms_result = ms_create_customerorder(headers=headers, not_found_product=not_found_product, seller=seller, market='ozon')
            if ms_result:
@@ -456,6 +464,7 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
                ms_update = True
 
         if ozon_awaiting_fbs_dict['found']:
+           print(f"ozon_status_fbs_dict {ozon_status_fbs_dict}")
            #found_product = {key: ozon_current_product[key] for key in ozon_awaiting_fbs_dict['found'] if key in ozon_current_product}
            if ozon_status_fbs_dict:
                #if ozon_status_fbs_dict['awaiting']:
@@ -463,16 +472,16 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
                    # вернуть в ozon_get_status_fbs
                    # if posting_number in existing_orders and existing_orders[posting_number] != status:
                    #ms_create_delivering(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['awaiting'])
-               if ozon_status_fbs_dict['delivering']: # доставлется (отгружено)
+               if ozon_status_fbs_dict.get('delivering'): # доставлется (отгружено)                                      
                    # вернуть в ozon_get_status_fbs
                    # if posting_number in existing_orders and existing_orders[posting_number] != status:
                    ms_create_delivering(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['delivering'])
-               if ozon_status_fbs_dict.get('received'):
-                   pass
+               if ozon_status_fbs_dict.get('delivered'):                   
+                   ms_create_sold(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['delivered'])
                if ozon_status_fbs_dict.get('cancelled'):
-                   pass
+                   ms_create_canceled(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['cancelled'])
 
-           #print(f'*' * 40)
+           print(f'*' * 40)
            #print(f'found_product {found_product}')
            #print(f'*' * 40)
     """
@@ -481,9 +490,10 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
     if cron_active_mp['wb']:
 
         wb_fbs_dict = wb_get_status_fbs(headers=headers, seller=seller) #здесь получаются все статусы
-        #print(f'*' * 40)
-        #print(f'wb_fbs_dict {wb_fbs_dict}')
-        #print(f'*' * 40)
+        print(f'*' * 40)
+        print(f'wb_fbs_dict {wb_fbs_dict}')
+        print(f'*' * 40)
+
         if 'error' not in wb_fbs_dict:
 
             wb_found_product = wb_fbs_dict['found']
@@ -493,16 +503,15 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
             #print(f'1' * 40)
             #print(f'wb_found_product {wb_found_product}')
             #print(f'1' * 40)
-            wb_sorted_product = wb_all_status['sorted']
 
             if wb_notfound_product:
                #print(f'*' * 40)
                not_found_product = {key: product for key in wb_notfound_product for product in wb_waiting_product if key == product.get('posting_number', '')}
                #print(f'*' * 40)
                if not_found_product:
-                   #print(f'2' * 40)
+                   #print(f'3' * 40)
                    #print(f'not_found_product {not_found_product}')
-                   #print(f'2' * 40)
+                   #print(f'3' * 40)
                    ms_result = ms_create_customerorder(headers=headers, not_found_product=not_found_product, seller=seller, market='wb')
                    if ms_result:
                        db_create_customerorder(not_found_product, market='wb', seller=seller)
@@ -510,19 +519,22 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
             if wb_found_product:
                #found_product = {key: wb_current_product[key] for key in wb_status_fbs_dict['found'] if key in wb_filter_product}
 
-               #print(f'*' * 40)
-               #print(f'wb_found_product {wb_found_product}')
-               #print(f'*' * 40)
-               print('tyt')
+               print(f'*' * 40)
+               print(f'wb_found_product {wb_found_product}')
+               print(f'* ' * 40)
+               
                if wb_all_status:
                    print(f'wb_all_status {wb_all_status}')
-                   if wb_all_status.get('sorted'): # доставлется (отгружено)
-                       print('tyt3')
-                       ms_create_delivering(headers=headers, seller=seller, market='wb', orders=wb_sorted_product)
+                   if wb_all_status.get('sorted'): # доставлется (отгружено)         
+                       print('sorted')              
+                       ms_create_delivering(headers=headers, seller=seller, market='wb', orders=wb_all_status['sorted'])
+                       print('доставлется')
                    if wb_all_status.get('sold'):
-                       pass
+                       ms_create_sold(headers=headers, seller=seller, market='wb', orders=wb_all_status['sold'])
+                       print('продано')
                    if wb_all_status.get('canceled'):
-                       pass
+                       ms_create_canceled(headers=headers, seller=seller, market='wb', orders=wb_all_status['canceled'])
+                       print('отменено')
 
     """
     YANDEX
@@ -557,16 +569,6 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
     if ms_update:
         ms_update_allstock_to_mp(headers=headers, seller=seller)
 
-
-
-    #customerorder_dict = await ms_check_customerorder(headers)
-
-
-
-    #    add_result = create_customorder_ms(order_dict)
-
-
-
 """
 async 
 Auto Update function
@@ -577,14 +579,20 @@ Auto Update function
 Auto Update function
 """
 
-
 def autoupdate_sync_inventory(cron_id):
     try:
         cron = Crontab.objects.select_related('seller').get(id=cron_id)
     except Crontab.DoesNotExist:
         logger_error.error(f"autoupdate_sync_inventory: Crontab с id {cron_id} не найден.")
+        return 'Cron not found'
 
-    if cron:
+    lock_key = f"lock:autoupdate_sync_inventory:{cron.seller.id}"
+
+    with redis_lock(lock_key, timeout=300) as acquired:
+        if not acquired:
+            print(f"[SKIP] Already running for seller {cron.seller.id}")
+            return 'Already running'
+
         cron_active_mp = {
             'yandex': cron.yandex,
             'ozon': cron.ozon,
@@ -592,47 +600,11 @@ def autoupdate_sync_inventory(cron_id):
         }
         if any(cron_active_mp.values()):
             headers = get_headers(cron.seller)
-            result_update_awaiting = update_awaiting_deliver_from_owm(headers=headers, seller=cron.seller, cron_active_mp=cron_active_mp)
+            result_update_awaiting = update_awaiting_deliver_from_owm(
+                headers=headers,
+                seller=cron.seller,
+                cron_active_mp=cron_active_mp
+            )
             return result_update_awaiting
         else:
             return 'No active'
-
-'''
-context['update_data'] = update_stock_mp_from_ms(headers=headers)
-codes = [context['update_data']['code'], context['wb']['code'], context['yandex']['code']]
-if all(code in (200, 204) for code in codes):
-    context['sync_update'] = True
-'''
-
-
-        #if row[7] is not None:
-        #    result_dict = await autoupdate_get_last_sync_acquisition_writeoff_ms(headers=headers)
-        #    if result_dict['enter'] == cron_dict['enter'] and result_dict['loss'] == cron_dict['loss']:
-                # запускаем тут автообноление синхронизация
-        #        pass
-        #    else:
-        #        context['update_data'] = update_stock_mp_from_ms(headers=headers)
-        #        codes = [context['update_data']['code'], context['wb']['code'], context['yandex']['code']]
-                # Проверка, все ли значения равны 200 или 204
-        #        if all(code in (200, 204) for code in codes):
-        #            context['sync_update'] = True
-        #            update_stmt = (update(crontab_table).where(crontab_table.c.id == cron_id).values(cron_dict=result_dict))
-    #await session.execute(update_stmt)
-    #await session.commit()
-
-
-
-    #return row_list
-    #for item in row_list:
-    #    print(f"autoupdate_sync_inventory success")
-    #    await autoupdate_get_last_sync_acquisition_writeoff_ms(headers=item['headers'], cron_data=item['cron_data'])
-
-
-
-
-
-
-
-
-
-

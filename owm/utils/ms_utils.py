@@ -1,6 +1,4 @@
 
-
-
 import requests
 import inspect
 import copy
@@ -409,7 +407,6 @@ def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: 
     '''
     Обновляем статус и отгружаем заказ на МойСклад
     '''
-
     response_data = ms_get_customorders(headers)
     ms_orders_dict = {order["name"]: order["id"] for order in response_data["response"]["rows"]}
     print(f"*" * 40)
@@ -463,8 +460,13 @@ def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: 
     #    "mediaType": "application/json"
     #}
 
+    len_order = len(orders)
+    i = 0
+
     for order in orders:
-        print(f"posting number {order['posting_number']}")
+        i += 1
+
+        print(f"[обновление {i} из {len_order}]posting number {order['posting_number']}")
         print(f"[ms_utils {inspect.currentframe().f_lineno}][ms_create_delivering][{market}] {order['posting_number']} - {ms_orders_dict[order['posting_number']]}")
         order_data = {
             "customerOrder": {
@@ -491,7 +493,7 @@ def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: 
             logging.error(f"[seller {seller.id}][ms_create_customerorder][response text]: {response.text}")
         # Дополнительные шаги для обработки результата
         if response.status_code != 200:
-            print(f"[ms_utils {inspect.currentframe().f_lineno}] Ошибка: сервер вернул код состояния {response.status_code}\n {response.text}")
+            print(f"[ms_utils {inspect.currentframe().f_lineno}] Ошибка: сервер вернул код состояния {response.status_code}\n{response.text}\n####################")
             error = response.json()
             code = (
                 error.get('errors', [{}])[0].get('code')
@@ -500,10 +502,7 @@ def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: 
             )
             if code == 3006:
                 db_update_customerorder(order['posting_number'], mp_mapping[market]['delivering'], seller)
-        else:
-
-            db_update_customerorder(order['posting_number'], mp_mapping[market]['delivering'], seller)
-
+        else:                        
             url_status = f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/{ms_orders_dict[order['posting_number']]}"
             status_meta = {
                 "href": f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/metadata/states/{metadata[db_mapping[market]['status']]['id']}",
@@ -518,6 +517,7 @@ def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: 
             try:
                 # меняем статус после добавления отгрузки
                 response = requests.put(url_status, headers=moysklad_headers, json=update_data)
+                db_update_customerorder(order['posting_number'], mp_mapping[market]['delivering'], seller)
             except requests.exceptions.JSONDecodeError:
                 logging.error(f"[seller {seller.id}][ms_create_customerorder][response text]: {response.text}")
             if response.status_code != 200:
@@ -572,3 +572,105 @@ def ms_get_all_stock(headers, metadata):
             continue
     sorted_stock_tuple = OrderedDict(sorted(stock_tuple.items()))
     return sorted_stock_tuple
+
+
+def ms_create_sold(headers: Dict[str, Any], seller: models.Model, market: str, orders: list):
+    '''
+    Обновляем статус на продано на МойСклад
+    '''
+    response_data = ms_get_customorders(headers)
+    ms_orders_dict = {order["name"]: order["id"] for order in response_data["response"]["rows"]}
+    
+    result = {}
+    
+    db_mapping = {
+        'ozon': {'storage': 'ms_storage_ozon', 'agent': 'ms_ozon_contragent', 'status': 'ms_status_completed'},
+        'wb': {'storage': 'ms_storage_wb', 'agent': 'ms_wb_contragent', 'status': 'ms_status_completed'},
+        'yandex': {'storage': 'ms_storage_yandex', 'agent': 'ms_yandex_contragent', 'status': 'ms_status_completed'}}
+        
+    mp_mapping = {
+        'ozon': {'sold': 'delivered'},
+        'wb': {'sold': 'sold'},
+        'yandex': {'sold': 'sold'}
+    }
+    
+    moysklad_headers = headers.get('moysklad_headers')
+    metadata = db_get_metadata(seller)
+    
+    for order in orders:
+        print(f"[ms_utils {inspect.currentframe().f_lineno}][ms_create_sold][{market}] {order['posting_number']} - {ms_orders_dict[order['posting_number']]}")
+        
+        url_status = f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/{ms_orders_dict[order['posting_number']]}"
+        status_meta = {
+            "href": f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/metadata/states/{metadata[db_mapping[market]['status']]['id']}",
+            "type": "state",
+            "mediaType": "application/json"
+        }
+        update_data = {
+            "state": {
+                "meta": status_meta
+            },
+        }
+        
+        try:
+            response = requests.put(url_status, headers=moysklad_headers, json=update_data)
+            if response.status_code == 200:
+                db_update_customerorder(order['posting_number'], mp_mapping[market]['sold'], seller)
+            else:
+                print(f">>>[ms_create_sold][update_data status] - Сервер вернул код состояния {response.status_code}")
+                print(f">>>[ms_create_sold][update_data status] - Ошибка: {response.text}")
+        except requests.exceptions.JSONDecodeError:
+            logging.error(f"[seller {seller.id}][ms_create_sold][response text]: {response.text}")
+    
+    return result
+
+
+def ms_create_canceled(headers: Dict[str, Any], seller: models.Model, market: str, orders: list):
+    '''
+    Обновляем статус на отменено на МойСклад
+    '''
+    response_data = ms_get_customorders(headers)
+    ms_orders_dict = {order["name"]: order["id"] for order in response_data["response"]["rows"]}
+    
+    result = {}
+    
+    db_mapping = {
+        'ozon': {'storage': 'ms_storage_ozon', 'agent': 'ms_ozon_contragent', 'status': 'ms_status_cancelled'},
+        'wb': {'storage': 'ms_storage_wb', 'agent': 'ms_wb_contragent', 'status': 'ms_status_cancelled'},
+        'yandex': {'storage': 'ms_storage_yandex', 'agent': 'ms_yandex_contragent', 'status': 'ms_status_cancelled'}}
+        
+    mp_mapping = {
+        'ozon': {'canceled': 'cancelled'},
+        'wb': {'canceled': 'canceled'},
+        'yandex': {'canceled': 'canceled'}
+    }
+    
+    moysklad_headers = headers.get('moysklad_headers')
+    metadata = db_get_metadata(seller)
+    
+    for order in orders:
+        print(f"[ms_utils {inspect.currentframe().f_lineno}][ms_create_canceled][{market}] {order['posting_number']} - {ms_orders_dict[order['posting_number']]}")
+        
+        url_status = f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/{ms_orders_dict[order['posting_number']]}"
+        status_meta = {
+            "href": f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/metadata/states/{metadata[db_mapping[market]['status']]['id']}",
+            "type": "state",
+            "mediaType": "application/json"
+        }
+        update_data = {
+            "state": {
+                "meta": status_meta
+            },
+        }
+        
+        try:
+            response = requests.put(url_status, headers=moysklad_headers, json=update_data)
+            if response.status_code == 200:
+                db_update_customerorder(order['posting_number'], mp_mapping[market]['canceled'], seller)
+            else:
+                print(f">>>[ms_create_canceled][update_data status] - Сервер вернул код состояния {response.status_code}")
+                print(f">>>[ms_create_canceled][update_data status] - Ошибка: {response.text}")
+        except requests.exceptions.JSONDecodeError:
+            logging.error(f"[seller {seller.id}][ms_create_canceled][response text]: {response.text}")
+    
+    return result

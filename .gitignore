@@ -4,5 +4,7 @@
 __pycache__/
 venv/
 crm3/settings.py
-migrations/
-!migrations/__init__.py
+**/migrations/
+**/migrations/**/*
+!**/migrations/__init__.py
+cline.json

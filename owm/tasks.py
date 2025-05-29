@@ -6,6 +6,7 @@ from celery import group
 import logging
 from .utils.base_utils import autoupdate_sync_inventory
 
+
 logger_info = logging.getLogger('crm3_info')
 
 @app.task

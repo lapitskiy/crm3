@@ -1,8 +1,31 @@
 import contextlib
+from contextlib import contextmanager
 from owm.models import Awaiting, Awaiting_product, Metadata, Settings, Seller
 from typing import Any, Dict
 
+import redis
+
+redis_client = redis.Redis(
+    host='redis',     # имя сервиса в docker-compose
+    port=6379,
+    db=0,
+    password='Billkill13',
+    decode_responses=True  # удобно, чтобы строки не были в байтах
+)
+
+@contextmanager
+def redis_lock(lock_name, timeout=180):
+    lock = redis_client.lock(lock_name, timeout=timeout)
+    have_lock = lock.acquire(blocking=False)
+    try:
+        yield have_lock
+    finally:
+        if have_lock:
+            lock.release()
+
 DATABASE_URL = "postgresql+asyncpg://crm3:Billkill13@postgres:5432/postgres"
+
+
 
 # Создаем движок
 
@@ -169,7 +192,3 @@ def db_update_settings(seller, type, settings_dict):
     if settings:
         settings.settings_dict = settings_dict
         settings.save()
-
-
-
-

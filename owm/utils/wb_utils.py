@@ -119,8 +119,8 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
     result = {}
 
     orders_db = db_get_status(seller=seller, market='wb')
-    # Получаем список заказов для 'ozon'
-    orders_list = orders_db.get('ozon', [])
+    # Получаем список заказов для 'wb'
+    orders_list = orders_db.get('wb', [])
     existing_orders = {order['posting_number']: order['status'] for order in orders_list}
 
     current_date = datetime.datetime.now()
@@ -145,10 +145,10 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
         all_orders = {}
         response = requests.get(url_all_orders, headers=wb_headers, params=params_all_orders)
         if response.status_code == 200:
-            all_orders = response.json()
+            all_orders = response.json() # тут статусов нет
             #print(f'Z' * 40)
             #print(f'Z' * 40)
-            #print(f"response_json all_orders: {all_orders}")
+            #print(f"response_json all_orders: {all_orders}")            
             #print(f'Z' * 40)
             #print(f'Z' * 40)
         else:
@@ -177,17 +177,20 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
 
     url_status_awaiting = 'https://marketplace-api.wildberries.ru/api/v3/orders/status'
 
+
+
     try:
         response = requests.post(url_status_awaiting, headers=wb_headers, json=all_status)
+        #print(f'STATUS')    
         if response.status_code == 200:
             status = response.json()
-            #print(f"response_json status: {status_awaiting}")
+            #print(f"response_json status: {status}")            
         else:
-            print(f"response_json status: {response.text}")
+            #print(f"response_json status: {response.text}")
             result['error'] = response.text
             return result
     except Exception as e:
-        print(f"response_json status: {response.text}")
+        #print(f"response_json status: {response.text}")
         result['error'] = f"Error in packag request: {e}"
         return result
 
@@ -204,10 +207,10 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
 
 
     status_map = {order['id']: order['wbStatus'] for order in status['orders']}
-    #print(f'%' * 40)
+    print(f'%' * 40)
     #print(f"status_map {status_map}")
     #print(f"awaiting {waiting_ids}")
-    #print(f'%' * 40)
+    print(f'%' * 40)
 
     filtered_status_map = {"waiting": [], "sorted": [], "sold": [], "canceled": []}
 
@@ -220,6 +223,7 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
         "declined_by_client": "canceled",
         "waiting": "waiting",
         "sorted": "sorted",
+        "ready_for_pickup": "sorted",
         "sold": "sold",
     }
 
@@ -232,40 +236,35 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
         mapped_status = status_aliases.get(wb_status)
         if mapped_status in filtered_status_map:
             filtered_status_map[mapped_status].append(order)
-    print(f'2' * 40)
-    print(f"filtered_status_map {filtered_status_map}")
-    print(f'2' * 40)
-    exit()
 
 
     filtered_result = {"waiting": [], "sorted": [], "sold": [], "canceled": []}
-    #print(f'%' * 40)
-    #print(f"filtered_status_map {filtered_status_map}")
-    #print(f"awaiting {waiting_ids}")
-    #print(f'%' * 40)
-
-    for status in status_list:
-        for order in filtered_status_map[status]:
-            posting_number = order["id"]
-            status = status
+    print(f'%' * 40)
+    print(f"existing_orders {existing_orders}")
+    print(f'%' * 40)
+    
+    for current_status in status_list:
+        for order in filtered_status_map[current_status]:
+            posting_number = str(order["id"])
+            #print(f'{posting_number} - {current_status}')
             if posting_number in existing_orders:
                 #print(f'{posting_number}')
                 existing_status = existing_orders[posting_number]
-                if existing_status != status:
+                if existing_status != current_status:
                     product_list = [{
                         "offer_id": order["article"],
                         "price": int(order["convertedPrice"]) / 100,
                         "quantity": 1
                     }]
-                    #print(f'{order["price"]}')
-                    #print(f'{product_list}\n\n')
-                    filtered_result[status].append({
-                        "posting_number": order["id"],
-                        "status": status,
+                    print(f'{order["price"]}')
+                    print(f'{product_list}\n\n')
+                    filtered_result[current_status].append({
+                        "posting_number": str(order["id"]),
+                        "status": current_status,
                         "product_list": product_list
                     })
             else:
-                if status == 'waiting':
+                if current_status == 'waiting':
                     product_list = [{
                         "offer_id": order["article"],
                         "price": int(order["convertedPrice"]) / 100,
@@ -273,16 +272,15 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
                     }]
                     #print(f'{order["price"]}')
                     #print(f'{product_list}\n\n')
-                    filtered_result[status].append({
+                    filtered_result[current_status].append({
                         "posting_number": order["id"],
-                        "status": status,
+                        "status": current_status,
                         "product_list": product_list
                     })
-
-    #print(f'%' * 40)
-    #print(f"filtered_result - {filtered_result}")
+    print(f'Z' * 40)
+    print(f"filtered_result - {filtered_result}")
     #print(f"awaiting {waiting_ids}")
-    #print(f'%' * 40)
+    print(f'Z' * 40)
 
     posting_numbers = [
         item['id']
