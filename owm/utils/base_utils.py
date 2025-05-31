@@ -441,8 +441,8 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
     """
         OZON
     """
-    cron_active_mp['ozon'] = False
-    cron_active_mp['wb'] = False
+    cron_active_mp['ozon'] = True
+    cron_active_mp['wb'] = True
     cron_active_mp['yandex'] = True
     ms_update = False
 
@@ -465,7 +465,7 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
                ms_update = True
 
         if ozon_awaiting_fbs_dict['found']:
-           print(f"ozon_status_fbs_dict {ozon_status_fbs_dict}")
+           #print(f"ozon_status_fbs_dict {ozon_status_fbs_dict}")
            #found_product = {key: ozon_current_product[key] for key in ozon_awaiting_fbs_dict['found'] if key in ozon_current_product}
            if ozon_status_fbs_dict:
                #if ozon_status_fbs_dict['awaiting']:
@@ -482,7 +482,7 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
                if ozon_status_fbs_dict.get('cancelled'):
                    ms_create_canceled(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['cancelled'])
 
-           print(f'*' * 40)
+           #print(f'*' * 40)
            #print(f'found_product {found_product}')
            #print(f'*' * 40)
     """
@@ -491,9 +491,9 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
     if cron_active_mp['wb']:
 
         wb_fbs_dict = wb_get_status_fbs(headers=headers, seller=seller) #здесь получаются все статусы
-        print(f'*' * 40)
-        print(f'wb_fbs_dict {wb_fbs_dict}')
-        print(f'*' * 40)
+        #print(f'*' * 40)
+        #print(f'wb_fbs_dict {wb_fbs_dict}')
+        #print(f'*' * 40)
         
 
         if 'error' not in wb_fbs_dict:
@@ -521,63 +521,67 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
             if wb_found_product:
                #found_product = {key: wb_current_product[key] for key in wb_status_fbs_dict['found'] if key in wb_filter_product}
 
-               print(f'*' * 40)
-               print(f'wb_found_product {wb_found_product}')
-               print(f'* ' * 40)
+               #print(f'*' * 40)
+               #print(f'wb_found_product {wb_found_product}')
+               #print(f'* ' * 40)
                
                if wb_all_status:
-                   print(f'wb_all_status {wb_all_status}')
+                   #print(f'wb_all_status {wb_all_status}')
                    if wb_all_status.get('sorted'): # доставлется (отгружено)         
-                       print('sorted')              
+                       #print('sorted')              
                        ms_create_delivering(headers=headers, seller=seller, market='wb', orders=wb_all_status['sorted'])
-                       print('доставлется')
+                       #print('доставлется')
                    if wb_all_status.get('sold'):
                        ms_create_sold(headers=headers, seller=seller, market='wb', orders=wb_all_status['sold'])
-                       print('продано')
+                       #print('продано')
                    if wb_all_status.get('canceled'):
                        ms_create_canceled(headers=headers, seller=seller, market='wb', orders=wb_all_status['canceled'])
-                       print('отменено')
+                       #print('отменено')
 
     """
     YANDEX
     """
     if cron_active_mp['yandex']:
 
-        yandex_fbs_dict = yandex_get_orders_fbs(headers)
+        yandex_fbs_dict = yandex_get_orders_fbs(headers=headers, seller=seller)
        
-        print(f'yandex_fbs_dict {yandex_fbs_dict}')
-        print(f'Y' * 40)
+        #print(f'yandex_fbs_dict {yandex_fbs_dict}')
+        #print(f'Y' * 40)
 
         if 'error' not in yandex_fbs_dict:
             yandex_all_product = yandex_fbs_dict['filter_product']
+            yandex_waiting_product = yandex_all_product['waiting']
             yandex_found_product = yandex_fbs_dict['found']
             yandex_notfound_product = yandex_fbs_dict['not_found']            
 
         if yandex_notfound_product:
-            #print(f'*' * 40)
-            not_found_product = {key: product for key in yandex_notfound_product for product in yandex_all_product if
+            #print(f'*' * 40\
+            #print(f'yandex_all_product {yandex_all_product}')
+            not_found_product = {key: product for key in yandex_notfound_product for product in yandex_waiting_product if
                                  key == product.get('posting_number', '')}
             if not_found_product:                
-            #print(f'not_found_product {not_found_product}')
-            #print(f'*' * 40)
+                #print(f'*' * 40)
+                #print(f'not_found_product {not_found_product}')
+                #print(f'*' * 40)
+                
                 ms_result = ms_create_customerorder(headers=headers, not_found_product=not_found_product, seller=seller, market='yandex')
                 if ms_result:
                     db_create_customerorder(not_found_product, market='yandex', seller=seller)
                     ms_update = True
         if yandex_found_product:
-            found_product = {key: yandex_current_product[key] for key in yandex_found_product if key in yandex_all_product}
+            #found_product = {key: yandex_current_product[key] for key in yandex_found_product if key in yandex_all_product}
             
-            if yandex_all_status:
-                if yandex_all_status.get('sorted'): # доставлется (отгружено)         
-                    print('sorted')              
-                    ms_create_delivering(headers=headers, seller=seller, market='yandex', orders=wb_all_status['sorted'])
-                    print('доставлется')
-                if yandex_all_status.get('sold'):
-                    ms_create_sold(headers=headers, seller=seller, market='yandex', orders=wb_all_status['sold'])
-                    print('продано')
-                if yandex_all_status.get('canceled'):
-                    ms_create_canceled(headers=headers, seller=seller, market='yandex', orders=wb_all_status['canceled'])
-                    print('отменено')
+            if yandex_all_product:
+                if yandex_all_product.get('sorted'): # доставлется (отгружено)         
+                    #print('sorted')              
+                    ms_create_delivering(headers=headers, seller=seller, market='yandex', orders=yandex_all_product['sorted'])
+                    #print('доставлется')
+                if yandex_all_product.get('sold'):
+                    ms_create_sold(headers=headers, seller=seller, market='yandex', orders=yandex_all_product['sold'])
+                    #print('продано')
+                if yandex_all_product.get('canceled'):
+                    ms_create_canceled(headers=headers, seller=seller, market='yandex', orders=yandex_all_product['canceled'])
+                    #print('отменено')
             #print(f'*' * 40)
             #print(f'found_product {found_product}')
             #print(f'*' * 40)

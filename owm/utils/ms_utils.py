@@ -409,9 +409,9 @@ def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: 
     '''
     response_data = ms_get_customorders(headers)
     ms_orders_dict = {order["name"]: order["id"] for order in response_data["response"]["rows"]}
-    print(f"*" * 40)
-    print(f'response ms_get_customorders: {response_data["response"]["rows"][0]}')
-    print(f"*" * 40)
+    #print(f"*" * 40)
+    #print(f'response ms_get_customorders: {response_data["response"]["rows"][0]}')
+    #print(f"*" * 40)
 
     result = {}
 
@@ -465,9 +465,8 @@ def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: 
 
     for order in orders:
         i += 1
-
         print(f"[обновление {i} из {len_order}]posting number {order['posting_number']}")
-        print(f"[ms_utils {inspect.currentframe().f_lineno}][ms_create_delivering][{market}] {order['posting_number']} - {ms_orders_dict[order['posting_number']]}")
+        #print(f"[ms_utils {inspect.currentframe().f_lineno}][ms_create_delivering][{market}] {order['posting_number']} - {ms_orders_dict[order['posting_number']]}")
         order_data = {
             "customerOrder": {
                 "meta": {
@@ -493,7 +492,7 @@ def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: 
             logging.error(f"[seller {seller.id}][ms_create_customerorder][response text]: {response.text}")
         # Дополнительные шаги для обработки результата
         if response.status_code != 200:
-            print(f"[ms_utils {inspect.currentframe().f_lineno}] Ошибка: сервер вернул код состояния {response.status_code}\n{response.text}\n####################")
+            print(f"[ms_utils {inspect.currentframe().f_lineno}] Ошибка: сервер вернул код состояния {response.status_code}\n{response.text}")
             error = response.json()
             code = (
                 error.get('errors', [{}])[0].get('code')
@@ -597,7 +596,12 @@ def ms_create_sold(headers: Dict[str, Any], seller: models.Model, market: str, o
     moysklad_headers = headers.get('moysklad_headers')
     metadata = db_get_metadata(seller)
     
+    len_order = len(orders)
+    i = 0
+    
     for order in orders:
+        i += 1
+        print(f"[обновление {i} из {len_order}]posting number {order['posting_number']}")
         print(f"[ms_utils {inspect.currentframe().f_lineno}][ms_create_sold][{market}] {order['posting_number']} - {ms_orders_dict[order['posting_number']]}")
         
         url_status = f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/{ms_orders_dict[order['posting_number']]}"

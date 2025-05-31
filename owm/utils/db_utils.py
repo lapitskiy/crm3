@@ -20,8 +20,11 @@ def redis_lock(lock_name, timeout=180):
     try:
         yield have_lock
     finally:
-        if have_lock:
-            lock.release()
+        if have_lock and lock.locked():
+            try:
+                lock.release()
+            except redis.exceptions.LockNotOwnedError:
+                pass
 
 DATABASE_URL = "postgresql+asyncpg://crm3:Billkill13@postgres:5432/postgres"
 
