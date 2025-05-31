@@ -8,3 +8,5 @@ crm3/settings.py
 **/migrations/**/*
 !**/migrations/__init__.py
 cline.json
+*.log
+**/*.log
