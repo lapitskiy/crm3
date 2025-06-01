@@ -700,8 +700,14 @@ class SettingsMatchingArticle(View):
 
 class PriceOzon(View):
     def get(self, request, *args, **kwargs):
+        
+        if not request.user.is_authenticated:
+            return redirect('login')  # или другая страница
+
+        user_company = request.user.userprofile.company
+        seller = Seller.objects.filter(company=user_company).first()
+        
         context = {}
-        seller = Seller.objects.get(user=request.user)
 
         parser_data = {
             'moysklad_api': seller.moysklad_api,
@@ -710,10 +716,10 @@ class PriceOzon(View):
             'ozon_api': seller.ozon_api,
             'ozon_id': seller.client_id,
         }
-        headers = get_headers(parser_data)
+        
+        headers = get_headers(seller)
         price = ozon_get_all_price(headers)
         context['price'] = price #dict(list(price.items())[:1]) # price
-        #print(f"stock {stock}")
         return render(request, 'owm/price_ozon.html', context)
 
     def post(self, request, *args, **kwargs):

@@ -32,8 +32,6 @@ function input() {
         $(this).show();
      });
 
-
-
 }
 </script>
 
@@ -48,60 +46,103 @@ function input() {
 
             <div class="table-responsive">
 <table class="table table-rounded table-row-bordered border gy-7 gs-7">
-		<thead>
-			<tr class="fw-semibold fs-6 text-gray-800 border-bottom border-gray-400">
-				<th>Артикул</th>
-				<th>Цена</th>
-				<th>FBS/FBO</th>
-                <th>Оптовая</th>
-                <th>Прибыль FBS/FBO</th>
-                <th>Продано (пред. месяц)</th>
-			</tr>
-		</thead>
-		<tbody>
+    <thead>
+        <tr class="fw-semibold fs-6 text-gray-800 border-bottom border-gray-400">
+            <th>Артикул</th>
+            <th>Актуальная цена</th>
+            <th>Комиссия FBS/FBO</th>
+            <th>Оптовая</th>
+            <th>Прибыль FBS/FBO</th>
+            <th>Продано (пред. месяц)</th>
+        </tr>
+        <tr class="fw-semibold fs-6 text-gray-800 border-bottom border-gray-400">
+            <td></td>
+            <td colspan="1"></td>
+            <td colspan="1"></td>
+            <td colspan="1"></td>
+            <td colspan="1"></td>
+            <td colspan="1" style="font-weight:bold;">Цена</td>
+        </tr>
+    </thead>
+    <tbody>
 
-        {% for offer_id, value in price.items %}
-			<tr id="{{ offer_id }}" class="fw-bold fs-6 text-gray-800 border-gray-400 {{ value.sale_qty|get_row_class }}">
-				<td>{{ offer_id }}</td>
-				<td>
-                    <input type="hidden" id="{{ offer_id }}" name="{{ offer_id }}" value="offer_id" />
-                    <a href="https://seller.ozon.ru/app/prices/manager/{{ value.product_id }}/prices">Посмотреть цену товара в личном кабинете ozon</a>
-                    <br><br>
-                    Минимальная
-                <input type="text" class="form-control" name="{{ offer_id }}_min_price" id="{{ offer_id }}" aria-describedby="basic-addon3" value="{{ value.min_price }}"/>
-                    <button class="btn btn-primary position-relative me-5" disabled style="margin-top: 5px;">
-                        <span style="position: relative; top: 5px; left: 2px;">{{ value.min_price_percent30 }}</span>
-                        <span class="ms-4 mt-2 position-absolute top-0 start-0 translate-middle badge badge-primary badge-danger">30%</span>
-                    </button>
-                    <button class="btn btn-primary position-relative me-5" disabled style="margin-top: 5px;">
-                        <span style="position: relative; top: 5px; left: 2px;">{{ value.min_price_percent50 }}</span>
-                         <span class="ms-4 mt-2  position-absolute top-0 start-0 translate-middle badge badge-primary badge-danger">50%</span>
-                    </button>
-                    <button class="btn btn-primary position-relative me-5" disabled style="margin-top: 5px;">
-                        <span style="position: relative; top: 5px; left: 2px;">{{ value.min_price_percent80 }}</span>
-                         <span class="ms-4 mt-2  position-absolute top-0 start-0 translate-middle badge badge-primary badge-danger">80%</span>
-                    </button>
-                    <button class="btn btn-primary position-relative me-5" disabled style="margin-top: 5px;">
-                        <span style="position: relative; top: 5px; left: 2px;">{{ value.min_price_percent100 }}</span>
-                         <span class="ms-4 mt-2  position-absolute top-0 start-0 translate-middle badge badge-primary badge-danger">100%</span>
-                    </button>
-                    <br><br>Текущая акция {{ value.marketing_seller_price }}
-                </td>
-				<td>{{ value.delivery_price }}</td>
-                <td>{{ value.opt_price }}</td>
-                <td>{{ value.profit_price }}
-                    {% if value.profit_percent > 0 %}
-                        (<span style="color:#5ab738">{{ value.profit_percent }}%</span>)
-                    {% else %}
-                        (<span style="color:#ff2b4a">{{ value.profit_percent }}%</span>)
-                    {% endif %}
-                </td>
-                <td>{{ value.sale_qty }}</td>
-			</tr>
-        {% endfor %}
-        		</tbody>
-	</table>
+    {% for offer_id, value in price.items %}
+        <tr id="{{ offer_id }}" class="fw-bold fs-6 text-gray-800 border-gray-400 {{ value.sale_qty|get_row_class }}">
+            <td>{{ offer_id }}</td>
+            <td>Текущая акция {{ value.marketing_seller_price }}</td>
+            <td>
+                FBS: {{ value.fbs_delivery_total }}<br>
+                FBO: {{ value.fbo_delivery_total }}
+            </td>
+            <td>{{ value.opt_price }}</td>
+            <td>
+                FBS: {{ value.profit_price_fbs }} 
+                {% if value.profit_percent_fbs > 0 %}
+                    (<span style="color:#5ab738">{{ value.profit_percent_fbs }}%</span>)
+                {% else %}
+                    (<span style="color:#ff2b4a">{{ value.profit_percent_fbs }}%</span>)
+                {% endif %}
+                <br>
+                FBO: {{ value.profit_price_fbo }} 
+                {% if value.profit_percent_fbo > 0 %}
+                    (<span style="color:#5ab738">{{ value.profit_percent_fbo }}%</span>)
+                {% else %}
+                    (<span style="color:#ff2b4a">{{ value.profit_percent_fbo }}%</span>)
+                {% endif %}
+            </td>
+            <td>{{ value.sale_qty }}</td>
+        </tr>
+
+        <tr id="{{ offer_id }}" class="fw-bold fs-6 text-gray-800 border-gray-400 {{ value.sale_qty|get_row_class }}">
+            <td colspan="6">
+            <input type="hidden" id="{{ offer_id }}" name="{{ offer_id }}" value="offer_id" />
+            <a href="https://seller.ozon.ru/app/prices/manager/{{ value.product_id }}/prices">Посмотреть цену товара в личном кабинете ozon</a>
+            <br><br>
+            Минимальная
+            <input type="text" class="form-control" name="{{ offer_id }}_min_price" id="{{ offer_id }}" aria-describedby="basic-addon3" value="{{ value.min_price }}"/>
+            <div class="d-flex align-items-center" style="margin-top: 10px;">
+                <input type="range"
+                   class="form-range"
+                   min="0"
+                   max="100"
+                   step="1"
+                   value="0"
+                   id="discount_slider_{{ offer_id }}"
+                   style="width: 200px;"
+                   oninput="updateDiscountValue('{{ offer_id }}', this.value, {{ value.min_price }})">
+                <span class="ms-3">
+                <span id="discount_value_{{ offer_id }}">0</span>%
+                </span>
+                <span class="ms-4">
+                Цена: <span id="discounted_price_{{ offer_id }}">{{ value.min_price }}</span>
+                </span>
+            </div>
+            <br><br>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="6" style="height: 24px; background: transparent; border: none;"></td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
 </div>
         <button type="submit" class="btn btn-primary btn-block">Обновить цены</button>
     </form>
+
+
+<script>
+function updateDiscountValue(offerId, percent, minPrice) {
+    document.getElementById('discount_value_' + offerId).innerText = percent;
+    let discounted = Math.round(minPrice * (1 - percent / 100));
+    document.getElementById('discounted_price_' + offerId).innerText = discounted;
+    // Установить цену в поле ввода
+    let priceInput = document.querySelector('input[name="' + offerId + '_min_price"]');
+    if (priceInput) {
+        priceInput.value = discounted;
+    }
+}
+</script>    
 {% endblock %}
+
+

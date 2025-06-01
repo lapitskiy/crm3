@@ -630,90 +630,137 @@ def ozon_get_base_posting_number(posting_number: str) -> str:
 
 def ozon_get_all_price(headers):
     opt_price = ms_get_product(headers)
-    #print(f"opt_price {opt_price['rows'][0]['buyPrice']['value']}")
-    #print(f"opt_price {opt_price['rows'][0]['article']}")
-    opt_price_clear = {}
-    for item in opt_price['rows']:
-        #opt_price_clear['article'] = item['article']
-        #print(f"opt_price {item['buyPrice']['value']/100}")
-        opt_price_clear[item['article']] = {
-            'opt_price' : int(float(item['buyPrice']['value']) / 100),
+    if opt_price.get('error') is None:
+        opt_price_clear = {}
+        for item in opt_price['response']['rows']:
+            #opt_price_clear['article'] = item['article']
+            #print(f"opt_price {item['buyPrice']['value']/100}")
+            opt_price_clear[item['article']] = {
+                'opt_price' : int(float(item['buyPrice']['value']) / 100),
+                }
+
+        url = "https://api-seller.ozon.ru/v2/finance/realization"
+        now = datetime.datetime.now()
+        lastmonth_date = now - datetime.timedelta(days=now.day)
+        data = {
+            "year": lastmonth_date.year,
+            "month": lastmonth_date.month
+        }
+
+        #print(f"ozon_headers: {headers['ozon_headers']}")
+        response_raw = requests.post(url, headers=headers['ozon_headers'], json=data)
+        try:
+            response = response_raw.json()
+            #print(f"Ответ сервера: {response}")
+        except Exception as e:
+            print(f"Ошибка декодирования JSON: {e}\nОтвет сервера: {response_raw.text}")
+            response = {}
+        #print(f"utils.py | get_all_price_ozon | response: {response}")
+        realization = {}
+        for item in response.get('result', {}).get('rows', []):
+            offer_id = item['item'].get('offer_id')
+            quantity = item['delivery_commission']['quantity'] if item.get('delivery_commission') and 'quantity' in item['delivery_commission'] else 0
+
+            # Инициализируем, если offer_id нет в realization или оно равно None
+            if offer_id not in realization or realization[offer_id] is None:
+                realization[offer_id] = {'sale_qty': quantity}
+            else:
+                # Добавляем к sale_qty, если offer_id уже существует
+                realization[offer_id]['sale_qty'] = realization[offer_id].get('sale_qty', 0) + quantity
+
+        #print(f"realization {realization}")
+
+        url = "https://api-seller.ozon.ru/v5/product/info/prices"
+        data = {
+            "filter": {
+                "visibility": "ALL",
+            },
+                "last_id": "",
+                "limit": 1000
+            }
+        
+        response_raw = requests.post(url, headers=headers['ozon_headers'], json=data)
+        try:
+            response = response_raw.json()
+            #print(f"Ответ сервера: {response}")
+        except Exception as e:
+            print(f"Ошибка декодирования JSON: {e}\nОтвет сервера: {response_raw.text}")
+            response = {}
+        
+        #print(f"response {response['result']['items'][0]}")
+        result = {}
+        for item in response['items']:
+            #print(f'item {item}')
+            if item['offer_id'] not in opt_price_clear:
+                continue
+            if item['offer_id'] not in realization:
+                realization[item['offer_id']] = {'sale_qty': 0}
+                
+            marketing_seller_price = float(item['price']['marketing_seller_price']) / 100 # это минимальная цена которую тебе зачислит озон
+            
+            acquiring = item.get('acquiring', 2)
+            commissions = item.get('commissions', {})
+            sales_percent_fbs = commissions.get('sales_percent_fbs', 0)  # Процент комиссии за продажу (FBS)
+            fbs_deliv_to_customer_amount = commissions.get('fbs_deliv_to_customer_amount', 0)  # Последняя миля (FBS)
+            fbs_direct_flow_trans_max_amount = commissions.get('fbs_direct_flow_trans_max_amount', 0)  # Магистраль до (FBS)
+            fbs_direct_flow_trans_min_amount = commissions.get('fbs_direct_flow_trans_min_amount', 0)  # Магистраль от (FBS)
+            fbs_first_mile_max_amount = commissions.get('fbs_first_mile_max_amount', 0)  # Максимальная комиссия за обработку отправления (FBS)
+            fbs_first_mile_min_amount = commissions.get('fbs_first_mile_min_amount', 0)  # Минимальная комиссия за обработку отправления (FBS)
+            fbs_return_flow_amount = commissions.get('fbs_return_flow_amount', 0)  # Комиссия за возврат и отмену, обработка отправления (FBS)
+            fbo_deliv_to_customer_amount = commissions.get('fbo_deliv_to_customer_amount', 0)  # Последняя миля (FBO)
+            fbo_direct_flow_trans_max_amount = commissions.get('fbo_direct_flow_trans_max_amount', 0)  # Магистраль до (FBO)
+            fbo_direct_flow_trans_min_amount = commissions.get('fbo_direct_flow_trans_min_amount', 0)  # Магистраль от (FBO)
+            fbo_return_flow_amount = commissions.get('fbo_return_flow_amount', 0)  # Комиссия за возврат и отмену (FBO)
+            sales_percent_fbo = commissions.get('sales_percent_fbo', 0)  # Процент комиссии за продажу (FBO)
+            
+            opt_price_value = opt_price_clear[item['offer_id']]['opt_price']
+            
+            # Рассчитываем стоимость доставки для FBO, используя уже определённые переменные
+            # Вознаграждение Ozon — это sales_percent_fbo
+            
+            fbo_delivery_total = marketing_seller_price * float(sales_percent_fbo) \
+                + (marketing_seller_price * float(acquiring) / 100) \
+                + float(fbo_direct_flow_trans_min_amount) \
+                + float(fbo_deliv_to_customer_amount)
+
+            # FBS: добавляем среднее между fbs_first_mile_max_amount и fbs_first_mile_min_amount
+            fbs_first_mile_avg = (float(fbs_first_mile_max_amount) + float(fbs_first_mile_min_amount)) / 2
+            fbs_delivery_total = marketing_seller_price * float(sales_percent_fbs) \
+                + (marketing_seller_price * float(acquiring) / 100) \
+                + float(fbs_direct_flow_trans_min_amount) \
+                + float(fbs_deliv_to_customer_amount) \
+                + fbs_first_mile_avg            
+
+            # Для FBO
+            profit_price_fbo = int(marketing_seller_price * 100) - int(fbo_delivery_total) - opt_price_value
+            # Для FBS
+            profit_price_fbs = int(marketing_seller_price * 100) - int(fbs_delivery_total) - opt_price_value
+                                                                    
+
+            profit_percent_fbo = profit_price_fbo / opt_price_value * 100 if opt_price_value != 0 else 0
+            profit_percent_fbs = profit_price_fbs / opt_price_value * 100 if opt_price_value != 0 else 0
+
+            min_price = float(item['price']['min_price'])
+
+            result[item['offer_id']] = {
+                'product_id': int(float(item['product_id'])),
+                'min_price': int(min_price),
+                'marketing_seller_price': int(marketing_seller_price * 100),
+                'opt_price': opt_price_value,
+                'profit_percent_fbo': int(profit_percent_fbo),
+                'profit_percent_fbs': int(profit_percent_fbs),
+                'sale_qty': realization[item['offer_id']]['sale_qty'],
+                'profit_price_fbo': int(profit_price_fbo),
+                'profit_price_fbs': int(profit_price_fbs),
+                'fbs_delivery_total': int(fbs_delivery_total),
+                'fbo_delivery_total': int(fbo_delivery_total),
             }
 
-    url = "https://api-seller.ozon.ru/v2/finance/realization"
-    now = datetime.datetime.now()
-    lastmonth_date = now - datetime.timedelta(days=now.day)
-    data = {
-        "year": lastmonth_date.year,
-        "month": lastmonth_date.month
-    }
-
-    #print(f"ozon_headers: {headers['ozon_headers']}")
-    response = requests.post(url, headers=headers['ozon_headers'], json=data).json()
-    #print(f"utils.py | get_all_price_ozon | response: {response}")
-    realization = {}
-    for item in response.get('result', {}).get('rows', []):
-        offer_id = item['item'].get('offer_id')
-        quantity = item['delivery_commission']['quantity'] if item.get('delivery_commission') and 'quantity' in item['delivery_commission'] else 0
-
-        # Инициализируем, если offer_id нет в realization или оно равно None
-        if offer_id not in realization or realization[offer_id] is None:
-            realization[offer_id] = {'sale_qty': quantity}
-        else:
-            # Добавляем к sale_qty, если offer_id уже существует
-            realization[offer_id]['sale_qty'] = realization[offer_id].get('sale_qty', 0) + quantity
-
-    #print(f"realization {realization}")
-
-    url = "https://api-seller.ozon.ru/v4/product/info/prices"
-    data = {
-        "filter": {
-            "visibility": "IN_SALE",
-        },
-            "last_id": "",
-            "limit": 1000
-        }
-    response = requests.post(url, headers=headers['ozon_headers'], json=data).json()
-    #print(f"response {response['result']['items'][0]}")
-    result = {}
-    for item in response['result']['items']:
-        #print(f'item {item}')
-        if item['offer_id'] not in opt_price_clear:
-            continue
-        if item['offer_id'] not in realization:
-            realization[item['offer_id']] = {'sale_qty': 0}
-        delivery_price = float(item['price']['marketing_seller_price'])/100 * float(item['commissions']['sales_percent_fbs'])
-        delivery_price = delivery_price + float(item['commissions']['fbs_direct_flow_trans_min_amount']) \
-                         + float(item['commissions']['fbs_deliv_to_customer_amount']) + \
-                         float(item['price']['marketing_seller_price'])/100*1 # эквайринг 1% и 10% для средней цены
-        delivery_price = delivery_price + 15 # средняя цена доставки товара
-        #print(f"opt_price {item['offer_id']}")
-        profit_price = int(float(item['price']['marketing_seller_price'])) - \
-                       int(delivery_price) - opt_price_clear[item['offer_id']]['opt_price']
-        profit_percent = profit_price / opt_price_clear[item['offer_id']]['opt_price'] * 100
-        min_price = float(item['price']['min_price'])
-        min_price_percent30 = int(delivery_price) + (opt_price_clear[item['offer_id']]['opt_price'] * 1.3)
-        min_price_percent50 = int(delivery_price) + (opt_price_clear[item['offer_id']]['opt_price'] * 1.5)
-        min_price_percent80 = int(delivery_price) + (opt_price_clear[item['offer_id']]['opt_price'] * 1.8)
-        min_price_percent100 = int(delivery_price) + (opt_price_clear[item['offer_id']]['opt_price'] * 2)
-        #print(f"offer_id {item}")
-        result[item['offer_id']] = {
-            'product_id': int(float(item['product_id'])),
-            'min_price': int(min_price),
-            'min_price_percent30': int(min_price_percent30),
-            'min_price_percent50': int(min_price_percent50),
-            'min_price_percent80': int(min_price_percent80),
-            'min_price_percent100': int(min_price_percent100),
-            'marketing_seller_price': int(float(item['price']['marketing_seller_price'])),
-            'delivery_price': int(delivery_price),
-            'opt_price': opt_price_clear[item['offer_id']]['opt_price'],
-            'profit_price': profit_price,
-            'profit_percent': int(profit_percent),
-            'sale_qty': realization[item['offer_id']]['sale_qty']
-        }
-
-    #print(f'result ozon price {result}')
-    return result
+        print(f'result ozon price {result}')
+        return result
+    else:
+        result['error'] = opt_price['error']
+        return result
 
 def ozon_get_products(headers):
 

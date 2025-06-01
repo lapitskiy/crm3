@@ -29,9 +29,10 @@ def ms_get_product(headers):
     if response.status_code == 200:
         result['status_code'] = response.status_code
         result['response'] = response.json()
+        
     else:
         result['status_code'] = response.status_code
-        result['response'] = response.text
+        result['error'] = response.text
         logger_error.error(f"error ms_get_product: {response.text}")
     return result
 
