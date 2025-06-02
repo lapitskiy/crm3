@@ -154,7 +154,7 @@ def yandex_get_orders_fbs(headers: dict, seller: Seller):
                     })
             else:
                 if current_status == 'waiting':                    
-                    print(f"order {order}")
+                    #print(f"order {order}")
                     product_list = []
                     for item in order.get('items', []):
                         product_list.append({

@@ -515,7 +515,7 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
                    #print(f'not_found_product {not_found_product}')
                    #print(f'3' * 40)
                    ms_result = ms_create_customerorder(headers=headers, not_found_product=not_found_product, seller=seller, market='wb')
-                   if ms_result:
+                   if ms_result and 'error' not in ms_result:
                        db_create_customerorder(not_found_product, market='wb', seller=seller)
                        ms_update = True
             if wb_found_product:

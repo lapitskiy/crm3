@@ -24,16 +24,19 @@ def ms_get_product(headers):
         ("limit", 1000)
     ]
     result = {}
-    response = requests.get(url, headers=moysklad_headers, params=params)
-
-    if response.status_code == 200:
-        result['status_code'] = response.status_code
-        result['response'] = response.json()
-        
-    else:
-        result['status_code'] = response.status_code
-        result['error'] = response.text
-        logger_error.error(f"error ms_get_product: {response.text}")
+    try:
+        response = requests.get(url, headers=moysklad_headers, params=params)
+        if response.status_code == 200:
+            result['status_code'] = response.status_code
+            result['response'] = response.json()
+        else:
+            result['status_code'] = response.status_code
+            result['error'] = '[ms_get_product] ' + response.text
+            logger_error.error(f"error ms_get_product: {response.text}")
+    except requests.exceptions.ConnectionError as e:
+        result['status_code'] = None
+        result['error'] = f"[ms_get_product] Connection error: {e}"
+        logger_error.error(f"Connection error in ms_get_product: {e}")
     return result
 
 def ms_get_organization_meta(headers) -> list:
