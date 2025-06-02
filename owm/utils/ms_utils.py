@@ -260,8 +260,8 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
             'yandex': {'storage': 'ms_storage_yandex', 'agent': 'ms_yandex_contragent', 'status': 'ms_status_awaiting'}}
 
     moysklad_headers = headers.get('moysklad_headers')
-    metadata = db_get_metadata(seller)
-    if metadata:
+    metadata = db_get_metadata(seller)    
+    if metadata.get('ms_status_awaiting'):
 
         products = ms_get_product(headers)
 
