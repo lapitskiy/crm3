@@ -636,14 +636,15 @@ class SettingsStatus(View):
     def post(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return redirect('login')  # или другая страница
-        context = {}
+
+        user_company = request.user.userprofile.company
+        seller = Seller.objects.filter(company=user_company).first()
+
         metadata={}
         metadata['ms_status_awaiting'] = {'id': request.POST.get('awaiting_select'), 'name': request.POST.get('hidden-awaiting')}
         metadata['ms_status_shipped'] = {'id': request.POST.get('shipped_select'), 'name': request.POST.get('hidden-shipped')}
         metadata['ms_status_completed'] = {'id': request.POST.get('completed_select'), 'name': request.POST.get('hidden-completed')}
         metadata['ms_status_cancelled'] = {'id': request.POST.get('cancelled_select'), 'name': request.POST.get('hidden-cancelled')}
-
-        seller = Seller.objects.get(user=request.user)
 
         db_update_metadata(seller=seller, metadata=metadata)
 
