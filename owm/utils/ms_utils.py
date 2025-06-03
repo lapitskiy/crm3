@@ -281,8 +281,11 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
             product_list = value.get('product_list', [])
 
             # Если хоть один продукт не найден в article_to_id, помечаем заказ на удаление
-            if any(product.get('offer_id') not in article_to_id for product in product_list):
-                orders_to_delete.append(key)
+            for product in product_list:
+                if product.get('offer_id') not in article_to_id:
+                    print(f"Нет товара с таким артиклем на MS: {product.get('offer_id')}")
+                    orders_to_delete.append(key)
+                    
 
         # Удаляем помеченные заказы
         for key in orders_to_delete:
@@ -387,16 +390,22 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
         #print(f'data {data}')
 
         try:
-            response = requests.post(url, headers=moysklad_headers, json=data)
+            if data:
+                response = requests.post(url, headers=moysklad_headers, json=data)
+            else:
+                return False
         except requests.exceptions.RequestException as e:
             print(f"[RequestException seller {seller.id}][ms_create_customerorder][{market}]: {str(e)}")
             logging.error(f"[seller {seller.id}][ms_create_customerorder][Request error]: {str(e)}")
             return False            
         # Дополнительные шаги для обработки результата
         if response.status_code != 200:
+            
             print(f"[!200 seller {seller.id}][ms_create_customerorder][response text][{market}]: {response.text}")
             print(f"Ошибка: сервер вернул код состояния {response.status_code}")                
-            print(f'not_found_product {not_found_product}') 
+            print(f'not_found_product {not_found_product}')             
+            print(f'*' * 40)
+            print(f'data {data}') 
             print(f'*' * 40)
             try:
                 error_block = json.loads(response.text)[0]  # первый блок
