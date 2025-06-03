@@ -10,3 +10,4 @@ crm3/settings.py
 cline.json
 *.log
 **/*.log
+celerybeat-schedule
