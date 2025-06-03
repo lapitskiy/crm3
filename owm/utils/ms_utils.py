@@ -253,7 +253,8 @@ def ms_cancel_order(headers: Dict[str, Any], posting_number: str):
     pass
 
 def ms_create_customerorder(headers: dict, not_found_product: dict, seller: models.Model, market: str):
-    result = False
+    print(f'*' * 40)
+    print(f'not_found_product {not_found_product}')      
     mapping = {
             'ozon': {'storage': 'ms_storage_ozon', 'agent': 'ms_ozon_contragent', 'status': 'ms_status_awaiting'},
             'wb': {'storage': 'ms_storage_wb', 'agent': 'ms_wb_contragent', 'status': 'ms_status_awaiting'},
@@ -382,30 +383,26 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
             # Добавляем сформированный заказ в общий список
             data.append(order_data)
 
-
+   
+        #print(f'*' * 40)
+        #print(f'data {data}')
 
         try:
             response = requests.post(url, headers=moysklad_headers, json=data)
-            #logging.info(f"[seller {seller.id}][ms_create_customerorder][response json]: {response.json()}")
-            #print(f"*" * 40)
-            #print(f"*" * 40)
-            #print(f"response_json MS: {data}")
-            #print(f"*" * 40)
-            #print(f"*" * 40)
-        except requests.exceptions.JSONDecodeError:
-            print(f"[seller {seller.id}][ms_create_customerorder][response text]: {response.text}")
-            logging.error(f"[seller {seller.id}][ms_create_customerorder][response text]: {response.text}")
-
+        except requests.exceptions.RequestException as e:
+            print(f"[RequestException seller {seller.id}][ms_create_customerorder][{market}]: {str(e)}")
+            logging.error(f"[seller {seller.id}][ms_create_customerorder][Request error]: {str(e)}")
+            return False            
         # Дополнительные шаги для обработки результата
         if response.status_code != 200:
-            print(f"[seller {seller.id}][ms_create_customerorder][response text]: {response.text}")
+            print(f"[!200 seller {seller.id}][ms_create_customerorder][response text][{market}]: {str(order['posting_number'])} - {response.text}")
             print(f"Ошибка: сервер вернул код состояния {response.status_code}")
             return False
         else:
             return True
     else:
-        raise Exception(f"Error: обновите метадату в настройках Контрагенты")
-    return result
+        print(f"[seller {seller.id}][ms_create_customerorder][{market}]: Error: обновите метадату в настройках Контрагенты")
+        return False
 
 def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: str, orders: list):
     '''

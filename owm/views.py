@@ -783,6 +783,10 @@ class PriceYandex(View):
 class FinanceOzon(View):
     def get(self, request, *args, **kwargs):
         context = {}
+        
+        if not request.user.is_authenticated:
+            return redirect('login')  # или другая страница        
+        
         user_company = request.user.userprofile.company
         parser = Seller.objects.filter(company=user_company).first()
         headers = get_headers(parser)
