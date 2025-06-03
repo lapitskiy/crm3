@@ -253,9 +253,7 @@ def ms_cancel_order(headers: Dict[str, Any], posting_number: str):
     '''
     pass
 
-def ms_create_customerorder(headers: dict, not_found_product: dict, seller: models.Model, market: str):
-    print(f'*' * 40)
-    print(f'not_found_product {not_found_product}')      
+def ms_create_customerorder(headers: dict, not_found_product: dict, seller: models.Model, market: str):     
     mapping = {
             'ozon': {'storage': 'ms_storage_ozon', 'agent': 'ms_ozon_contragent', 'status': 'ms_status_awaiting'},
             'wb': {'storage': 'ms_storage_wb', 'agent': 'ms_wb_contragent', 'status': 'ms_status_awaiting'},
@@ -396,8 +394,10 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
             return False            
         # Дополнительные шаги для обработки результата
         if response.status_code != 200:
-            print(f"[!200 seller {seller.id}][ms_create_customerorder][response text][{market}]: {str(order['posting_number'])} - {response.text}")
-            print(f"Ошибка: сервер вернул код состояния {response.status_code}")
+            print(f"[!200 seller {seller.id}][ms_create_customerorder][response text][{market}]: {response.text}")
+            print(f"Ошибка: сервер вернул код состояния {response.status_code}")                
+            print(f'not_found_product {not_found_product}') 
+            print(f'*' * 40)
             try:
                 error_block = json.loads(response.text)[0]  # первый блок
                 first_error = error_block.get("errors", [])[0]  # первая ошибка
