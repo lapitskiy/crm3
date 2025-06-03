@@ -9,6 +9,7 @@ from collections import OrderedDict
 
 from django.db import models
 
+import json
 
 from owm.utils.db_utils import db_get_metadata, db_update_customerorder
 
