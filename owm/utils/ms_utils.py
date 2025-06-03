@@ -397,6 +397,13 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
         if response.status_code != 200:
             print(f"[!200 seller {seller.id}][ms_create_customerorder][response text][{market}]: {str(order['posting_number'])} - {response.text}")
             print(f"Ошибка: сервер вернул код состояния {response.status_code}")
+            try:
+                error_block = json.loads(response.text)[0]  # первый блок
+                first_error = error_block.get("errors", [])[0]  # первая ошибка
+                if first_error.get("code") == 3006:
+                    return True
+            except Exception as parse_error:
+                print(f"Ошибка при разборе JSON: {parse_error}")
             return False
         else:
             return True
