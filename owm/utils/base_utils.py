@@ -448,17 +448,19 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
 
     if cron_active_mp['ozon']:
 
-        ozon_awaiting_fbs_dict = ozon_get_awaiting_fbs(headers)
-        
+        ozon_awaiting_fbs_dict = ozon_get_awaiting_fbs(headers)        
         ozon_found_product = ozon_awaiting_fbs_dict['found']
-        ozon_notfound_product = ozon_awaiting_fbs_dict['not_found']
-        
+        ozon_notfound_product = ozon_awaiting_fbs_dict['not_found']        
         ozon_current_product = ozon_awaiting_fbs_dict['current_product']
-
         ozon_status_fbs_dict = ozon_get_status_fbs(headers=headers, seller=seller) # получаем статусы с озона и сравниваем в базе
 
         if ozon_notfound_product:
-           not_found_product = {key: product for key in ozon_awaiting_fbs_dict['not_found'] for product in ozon_current_product if key in product.get('posting_number', '')}
+           not_found_product = {
+               str(key): product
+               for key in ozon_notfound_product
+               for product in ozon_current_product
+               if str(key) == str(product.get('posting_number', ''))
+           }
            ms_result = ms_create_customerorder(headers=headers, not_found_product=not_found_product, seller=seller, market='ozon')
            if ms_result:
                db_create_customerorder(not_found_product, market='ozon', seller=seller)
@@ -508,7 +510,12 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
 
             if wb_notfound_product:
                #print(f'*' * 40)
-               not_found_product = {key: product for key in wb_notfound_product for product in wb_waiting_product if key == product.get('posting_number', '')}
+               not_found_product = {
+                   str(key): product
+                   for key in wb_notfound_product
+                   for product in wb_waiting_product
+                   if str(key) == str(product.get('posting_number', ''))
+               }
                #print(f'*' * 40)
                if not_found_product:
                    #print(f'3' * 40)
@@ -554,20 +561,22 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
             yandex_found_product = yandex_fbs_dict['found']
             yandex_notfound_product = yandex_fbs_dict['not_found']            
 
+            print(f'*' * 40)
+            print(f'yandex_waiting_product {yandex_waiting_product}')
+                        
         if yandex_notfound_product:
-            #print(f'*' * 40)
-            #print(f'yandex_notfound_product {yandex_notfound_product}')
-            #print(f'*' * 40)
-            #print(f'yandex_waiting_product {yandex_waiting_product}')
-            
-            not_found_product = {key: product for key in yandex_notfound_product for product in yandex_waiting_product if
-                                 key == product.get('posting_number', '')}    
+            print(f'*' * 40)
+            print(f'YANDEX not_found_product {yandex_notfound_product}')
+            print(f'*' * 40)  
+            # Приводим оба значения к строке для корректного сравнения
+            not_found_product = {
+                str(key): product
+                for key in yandex_notfound_product
+                for product in yandex_waiting_product
+                if str(key) == str(product.get('posting_number', ''))
+            }
 
-            if not_found_product:                
-                #print(f'*' * 40)
-                #print(f'not_found_product {not_found_product}')
-                #print(f'*' * 40)
-                
+            if not_found_product:                                                                             
                 ms_result = ms_create_customerorder(headers=headers, not_found_product=not_found_product, seller=seller, market='yandex')
                 if ms_result:
                     db_create_customerorder(not_found_product, market='yandex', seller=seller)

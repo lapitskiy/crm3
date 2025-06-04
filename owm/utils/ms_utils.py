@@ -254,6 +254,7 @@ def ms_cancel_order(headers: Dict[str, Any], posting_number: str):
     pass
 
 def ms_create_customerorder(headers: dict, not_found_product: dict, seller: models.Model, market: str):     
+    
     mapping = {
             'ozon': {'storage': 'ms_storage_ozon', 'agent': 'ms_ozon_contragent', 'status': 'ms_status_awaiting'},
             'wb': {'storage': 'ms_storage_wb', 'agent': 'ms_wb_contragent', 'status': 'ms_status_awaiting'},
@@ -300,6 +301,7 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
                     product['id'] = article_to_id[offer_id]
 
         #print(f"result_dict {orders}")
+
 
 
         #organization_meta = ms_get_organization_meta(headers)
@@ -386,8 +388,8 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
             data.append(order_data)
 
    
-        #print(f'*' * 40)
-        #print(f'data {data}')
+        print(f'*' * 40)
+        print(f'data {data}')
 
         try:
             if data:
@@ -399,12 +401,10 @@ def ms_create_customerorder(headers: dict, not_found_product: dict, seller: mode
             logging.error(f"[seller {seller.id}][ms_create_customerorder][Request error]: {str(e)}")
             return False            
         # Дополнительные шаги для обработки результата
-        if response.status_code != 200:
-            
+        if response.status_code != 200:            
             print(f"[!200 seller {seller.id}][ms_create_customerorder][response text][{market}]: {response.text}")
             print(f"Ошибка: сервер вернул код состояния {response.status_code}")                
-            print(f'not_found_product {not_found_product}')             
-            print(f'*' * 40)
+            print(f'not_found_product {not_found_product}')                         
             print(f'data {data}') 
             print(f'*' * 40)
             try:

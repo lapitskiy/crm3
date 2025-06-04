@@ -121,7 +121,7 @@ def yandex_get_orders_fbs(headers: dict, seller: Seller):
             filtered_status_map[mapped_status].append(order)
         
     #print(f"filtered_status_map waiting: {filtered_status_map['waiting']}")    
-    #print(f'* ' * 40)
+    #print(f'* ' * 40)    
     #print(f"filtered_status_map sorted: {filtered_status_map['sorted']}")    
     #print(f'* ' * 40)
     #print(f"waiting {json.dumps(filtered_status_map['waiting'][:8], indent=2, ensure_ascii=False)}")
@@ -132,41 +132,31 @@ def yandex_get_orders_fbs(headers: dict, seller: Seller):
     
     filtered_result = {"waiting": [], "sorted": [], "sold": [], "canceled": []}
     
-    
     for current_status in status_list:
         for order in filtered_status_map[current_status]:
             posting_number = str(order["id"])
-            if posting_number in existing_orders:
-                #print(f'{posting_number}')
-                existing_status = existing_orders[posting_number]
-                if existing_status != current_status:
-                    product_list = []
-                    for item in order.get('items', []):
-                        product_list.append({
-                            "offer_id": item.get("offerId") or item.get("offer_id"),
-                            "price": item.get('price', 0),
-                            "quantity": item.get('count', 1)
-                        })
-                    filtered_result[current_status].append({
-                        "posting_number": str(order["id"]),
-                        "status": current_status,
-                        "product_list": product_list
+            # Обрабатываем только если статус изменился или если это новый заказ в "waiting"
+            need_process = (
+                (posting_number in existing_orders and existing_orders[posting_number] != current_status)
+                or
+                (posting_number not in existing_orders and current_status == 'waiting')
+            )
+            if need_process:
+                product_list = []
+                for item in order.get('items', []):
+                    price = item.get("price", 0)
+                    subsidy = item.get("subsidy", 0)
+                    total_price = price + subsidy
+                    product_list.append({
+                        "offer_id": item.get("offerId") or item.get("offer_id"),
+                        "price": total_price,
+                        "quantity": item.get('count', 1)
                     })
-            else:
-                if current_status == 'waiting':                    
-                    #print(f"order {order}")
-                    product_list = []
-                    for item in order.get('items', []):
-                        product_list.append({
-                            "offer_id": item.get("offerId") or item.get("offer_id"),
-                            "price": item.get('price', 0),
-                            "quantity": item.get('count', 1)
-                        })
-                    filtered_result[current_status].append({
-                        "posting_number": order["id"],
-                        "status": current_status,
-                        "product_list": product_list
-                    })
+                filtered_result[current_status].append({
+                    "posting_number": posting_number,
+                    "status": current_status,
+                    "product_list": product_list
+                })
     
     
     result = {}
