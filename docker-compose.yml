@@ -1,5 +1,6 @@
 services:
   postgres:
+    restart: unless-stopped
     image: postgres:17  # Указание конкретной версии обеспечивает стабильность
     container_name: postgres17_crm3_cntnr
     environment:
@@ -12,6 +13,7 @@ services:
       - "5433:5432"
 
   redis:
+      restart: unless-stopped
       image: redis:latest  # Используем последнюю версию Redis
       container_name: redis_crm3_cntnr  # Название контейнера Redis
       ports:
@@ -26,6 +28,7 @@ services:
       #command: sh -c "redis-server --daemonize yes && sleep 3 && redis-cli FLUSHDB && redis-cli SAVE && redis-cli shutdown && rm -f /data/dump.rdb && redis-server"
 
   crm3:  # Название вашего приложения на Python
+    restart: unless-stopped
     build: .
     image: crm3:latest
     container_name: crm3_container
@@ -44,6 +47,7 @@ services:
     command: gunicorn --bind 0.0.0.0:8000 crm3.wsgi
 
   celery:  # Celery Worker
+    restart: unless-stopped
     image: crm3:latest
     command: celery -A crm3 worker --pool=prefork --loglevel=info
     environment:
@@ -60,6 +64,7 @@ services:
       - .:/app
 
   celery_beat:  # Celery Beat
+    restart: unless-stopped
     image: crm3:latest
     command: celery -A crm3 beat --loglevel=info
     environment:
