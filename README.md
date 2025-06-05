@@ -1,3 +1,4 @@
+
 [:u5272:Русский перевод](#Русский)
 
 CRM3
@@ -54,3 +55,12 @@ CRM3
 -
 читать [update.md](update.md)
 
+## 📄 License
+
+This project is licensed under the Business Source License 1.1 (with no Change Date).  
+You are free to use and modify the code for non-commercial purposes.  
+For commercial use, deployment, or installation — please contact the author via Telegram: [@lap1tsky](https://t.me/lap1tsky)
+
+Код проекта распространяется под Business Source License 1.1 (без Change Date).  
+Вы можете использовать и модифицировать проект бесплатно, если не используете его в коммерческих целях.  
+Для коммерческого использования и установки — свяжитесь с автором в Telegram: [@lap1tsky](https://t.me/lap1tsky)

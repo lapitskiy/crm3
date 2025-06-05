@@ -43,6 +43,41 @@ class Awaiting_product(models.Model):
     price = models.IntegerField(null=False, verbose_name='Цена')
     quantity = models.IntegerField(null=False, verbose_name='Количество')
 
+
+# Ваша логика верная: 
+# 1. Первый класс — настройки для продавца и маркетплейса (PromoMarketSettings).
+# 2. Второй класс — настройки для каждого товара на этом маркетплейсе (PromoProduct).
+
+class PromoMarketSettings(models.Model):
+    """
+    Настройки акций для продавца на конкретном маркетплейсе.
+    """
+    seller = models.ForeignKey(Seller, on_delete=models.CASCADE, related_name='promo_market_settings')
+    market = models.CharField(max_length=50, verbose_name='Маркетплейс')
+
+    class Meta:
+        unique_together = ('seller', 'market')
+        verbose_name = 'Настройки акций маркетплейса'
+        verbose_name_plural = 'Настройки акций маркетплейсов'
+
+class PromoProduct(models.Model):
+    """
+    Настройки участия товара в акциях для конкретного продавца и маркетплейса.
+    """
+    promo_market = models.ForeignKey(PromoMarketSettings, on_delete=models.CASCADE, related_name='products')
+    offer_id = models.CharField(max_length=50, verbose_name='ID товара')
+    min_price_fbs = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Мин. цена FBS')
+    disable_fbs = models.BooleanField(default=False, verbose_name='Отключить FBS')
+    min_price_promo = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Мин. цена для акции')
+    disable_promo = models.BooleanField(default=False, verbose_name='Отключить участие в акции')
+
+    class Meta:
+        unique_together = ('promo_market', 'offer_id')
+        verbose_name = 'Настройки акции товара'
+        verbose_name_plural = 'Настройки акций товаров'
+
+# ...existing code...
+
 class Metadata(models.Model):
     '''
     name:

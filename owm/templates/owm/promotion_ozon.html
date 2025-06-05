@@ -89,40 +89,268 @@ function input() {
                 {% endif %}
             </td>
         </tr>
-
-        <tr id="{{ offer_id }}" class="fw-bold fs-6 text-gray-800 border-gray-400 {{ value.sale_qty|get_row_class }}">
+        
+        <!-- Здесь можно добавить дополнительные строки или элементы для каждой строки товара, если нужно -->
+        <tr id="{{ offer_id }}_fbs_control" class="fw-bold fs-6 text-gray-800 border-gray-400 {{ value.sale_qty|get_row_class }}">
             <td colspan="6">
-            <input type="hidden" id="{{ offer_id }}" name="{{ offer_id }}" value="offer_id" />
+            <input type="hidden" id="{{ offer_id }}_fbs_control" name="{{ offer_id }}_fbs_control" value="{{ offer_id }}" />
             <a href="https://seller.ozon.ru/app/prices/manager/{{ value.product_id }}/prices">Посмотреть цену товара в личном кабинете ozon</a>
             <br><br>
-            <input type="checkbox" id="disable_fbs_{{ offer_id }}" name="disable_fbs_{{ offer_id }}">
-            <label for="disable_fbs_{{ offer_id }}">
-                Минимальная цена от текущей при которой товар перестает продаваться на FBS (выставляется остатки в 0 на FBS)<br>
-                (<i>используется если товар FBO продавать выгодно, но отгружать FBS не выгодно, а цену не поменять, тогда проще убрать остатки FBS если они по текущей акции не приносят прибыли.                
-                </i>)
+            <div class="d-flex align-items-start mb-2">
+            <input type="checkbox" id="disable_fbs_{{ offer_id }}" name="disable_fbs_{{ offer_id }}" class="me-2 mt-1">
+            <label for="disable_fbs_{{ offer_id }}" class="form-check-label" style="margin-bottom:0;">
+                <div>
+                <strong>Минимальная цена от текущей, при которой товар перестает продаваться на FBS</strong>
+                <br>
+                <span style="font-size: 90%;">
+                    (выставляется остатки в 0 на FBS)<br>
+                    - <i>используется если товар FBO продавать выгодно, но отгружать FBS не выгодно, а цену не поменять, тогда проще убрать остатки FBS если они по текущей акции не приносят прибыли.</i><br>
+                    - <i>функция активируется, если у товара есть остатки на FBO</i>
+                </span>
+                </div>
             </label>
+            </div>
             <input type="text" class="form-control" name="{{ offer_id }}_min_price_fbs" id="min_price_fbs_{{ offer_id }}" aria-describedby="basic-addon3" value="{{ value.min_price }}" style="width: 150px;" oninput="updateFBSProfitFromInput('{{ offer_id }}')"
-                data-opt-price="{{ value.opt_price }}"
-                data-acquiring="{{ value.acquiring }}"
-                data-sales-percent-fbs="{{ value.sales_percent_fbs }}"
-                data-fbs-deliv-to-customer-amount="{{ value.fbs_deliv_to_customer_amount }}"
-                data-fbs-direct-flow-trans="{{ value.fbs_direct_flow_trans }}"
-                data-fbs-first-mile-avg="{{ value.fbs_first_mile_avg }}"
+            data-opt-price="{{ value.opt_price }}"
+            data-acquiring="{{ value.acquiring }}"
+            data-sales-percent-fbs="{{ value.sales_percent_fbs }}"
+            data-fbs-deliv-to-customer-amount="{{ value.fbs_deliv_to_customer_amount }}"
+            data-fbs-direct-flow-trans="{{ value.fbs_direct_flow_trans }}"
+            data-fbs-first-mile-avg="{{ value.fbs_first_mile_avg }}"
             />
             <div class="d-flex align-items-center" style="margin-top: 10px;">
-                <span class="ms-4">
-                    Цена: <span id="discounted_price_{{ offer_id }}">{{ value.min_price }}</span>
-                </span>
-                <span class="ms-4" id="fbs_commission_profit_{{ offer_id }}">
-                    Комиссия FBS: {{ value.fbs_delivery_total }}<br>
-                    Прибыль FBS: {{ value.profit_price_fbs }} ({{ value.profit_percent_fbs }}%)
-                </span>
+            <span class="ms-4">
+            Цена: <span id="discounted_price_{{ offer_id }}">{{ value.min_price }}</span>
+            </span>
+            <span class="ms-4" id="fbs_commission_profit_{{ offer_id }}">
+            Комиссия FBS: {{ value.fbs_delivery_total }}<br>
+            Прибыль FBS: {{ value.profit_price_fbs }} ({{ value.profit_percent_fbs }}%)
+            </span>
             </div>
             <hr>
             <div class="mt-2" id="fbs_debug_{{ offer_id }}" style="font-size: 12px; color: #888;"></div>
             <br><br>
             </td>
         </tr>
+
+        <!-- Дублированный блок для limit_count -->
+        <tr id="{{ offer_id }}_limit_count" class="fw-bold fs-6 text-gray-800 border-gray-400 {{ value.sale_qty|get_row_class }}">
+            <td colspan="6">
+            <input type="hidden" id="{{ offer_id }}_limit_count" name="{{ offer_id }}_limit_count" value="{{ offer_id }}" />            
+            <br>
+            <div class="d-flex align-items-start mb-2">
+            <input type="checkbox" id="disable_limit_count_{{ offer_id }}" name="disable_limit_count_{{ offer_id }}" class="me-2 mt-1">
+            <label for="disable_limit_count_{{ offer_id }}" class="form-check-label" style="margin-bottom:0;">
+                <div>
+                <strong>Если остаток меньше указанного</strong>                
+                <br>
+                <span style="font-size: 90%;">                    
+                    - <i>если товара осталось мало, убираем его из всех акций не соотвествующей указанной цене, если акций нет выставляется "ваша цена" товара</i><br>                    
+                </span>
+                </div>                
+            </label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="number" class="form-control" name="{{ offer_id }}_limit_count_value" id="limit_count_value_{{ offer_id }}" value="{{ value.limit_count|default_if_none:1 }}" min="1" style="width: 100px;" placeholder="Кол-во">
+                <input type="text" class="form-control" name="{{ offer_id }}_min_price_limit_count" id="min_price_limit_count_{{ offer_id }}" aria-describedby="basic-addon3" value="{{ value.min_price }}" style="width: 150px;" 
+                oninput="updateLimitCountProfitFromInput('{{ offer_id }}')" 
+                data-opt-price="{{ value.opt_price }}" data-acquiring="{{ value.acquiring }}" 
+                data-sales-percent-fbs="{{ value.sales_percent_fbs }}" data-fbs-deliv-to-customer-amount="{{ value.fbs_deliv_to_customer_amount }}" 
+                data-fbs-direct-flow-trans="{{ value.fbs_direct_flow_trans }}" data-fbs-first-mile-avg="{{ value.fbs_first_mile_avg }}">
+            </div>
+            <div class="d-flex align-items-center" style="margin-top: 10px;">
+            <span class="ms-4">
+            Цена: <span id="discounted_price_limit_count_{{ offer_id }}">{{ value.min_price }}</span>
+            </span>
+            <span class="ms-4" id="fbs_commission_profit_limit_count_{{ offer_id }}">
+            Комиссия FBS: {{ value.fbs_delivery_total }}<br>
+            Прибыль FBS: {{ value.profit_price_fbs }} ({{ value.profit_percent_fbs }}%)
+            </span>
+            </div>
+            <hr>
+            <div class="mt-2" id="fbs_debug_limit_count_{{ offer_id }}" style="font-size: 12px; color: #888;"></div>
+            <br><br>
+            </td>
+        </tr>
+        <script>
+        function updateLimitCountProfitFromInput(offerId) {
+            let priceInput = document.querySelector('input[name="' + offerId + '_min_price_limit_count"]');
+            let discounted = parseFloat(priceInput.value.replace(',', '.')) || 0;
+            document.getElementById('discounted_price_limit_count_' + offerId).innerText = discounted;
+
+            let optPrice = parseFloat(priceInput.getAttribute('data-opt-price')) || 0;
+            let acquiring = parseFloat(priceInput.getAttribute('data-acquiring')) || 0;
+            let salesPercentFbs = parseFloat(priceInput.getAttribute('data-sales-percent-fbs')) || 0;
+            let fbsDelivToCustomerAmount = parseFloat(priceInput.getAttribute('data-fbs-deliv-to-customer-amount')) || 0;
+            let fbsDirectFlowTransAmount = parseFloat(priceInput.getAttribute('data-fbs-direct-flow-trans')) || 0;
+            let fbs_first_mile_avg = parseFloat(priceInput.getAttribute('data-fbs-first-mile-avg')) || 0;
+
+            let marketing_seller_price = discounted;
+
+            let fbs_delivery_total = 
+            (marketing_seller_price * (salesPercentFbs / 100)) +
+            (marketing_seller_price * (acquiring / 100)) +
+            fbsDirectFlowTransAmount +
+            fbsDelivToCustomerAmount +
+            fbs_first_mile_avg;
+
+            fbs_delivery_total = Math.round(fbs_delivery_total);
+
+            let profit_price_fbs = Math.round(discounted - fbs_delivery_total - optPrice);
+            let profit_percent_fbs = optPrice !== 0 ? Math.round(profit_price_fbs / optPrice * 100) : 0;
+
+            document.getElementById('fbs_commission_profit_limit_count_' + offerId).innerHTML =
+            'Комиссия FBS: ' + fbs_delivery_total + '<br>' +
+            'Прибыль FBS: ' + profit_price_fbs + ' (' + profit_percent_fbs + '%)';
+
+            // Debug output
+            document.getElementById('fbs_debug_limit_count_' + offerId).innerHTML =
+            '<b>DEBUG:</b><br>' +
+            'Цена: ' + marketing_seller_price + '<br>' +
+            'optPrice: ' + optPrice + '<br>' +
+            'acquiring: ' + acquiring + '<br>' +
+            'salesPercentFbs: ' + salesPercentFbs + '<br>' +
+            'fbsDelivToCustomerAmount: ' + fbsDelivToCustomerAmount + '<br>' +
+            'fbsDirectFlowTransAmount: ' + fbsDirectFlowTransAmount + '<br>' +
+            'fbs_first_mile_avg: ' + fbs_first_mile_avg + '<br>' +
+            'fbs_delivery_total: ' + fbs_delivery_total + '<br>';
+        }
+
+        // Автоматически показать дебаг при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            updateLimitCountProfitFromInput('{{ offer_id }}');
+        });
+        </script>
+
+
+        <tr id="{{ offer_id }}_promo" class="fw-bold fs-6 text-gray-800 border-gray-400 {{ value.sale_qty|get_row_class }}">
+            <td colspan="6">
+            <input type="hidden" id="{{ offer_id }}_promo" name="{{ offer_id }}_promo" value="offer_id" />
+            <div class="d-flex align-items-start mb-2">
+                <input type="checkbox" id="disable_promo_{{ offer_id }}" name="disable_promo_{{ offer_id }}" class="me-2 mt-1">
+                <label for="disable_promo_{{ offer_id }}" class="form-check-label" style="margin-bottom:0;">
+                <div>
+                    <strong>Отключить участие товара в акции, которая ниже указанной цены (в остальных акциях товар продолжит участвовать)</strong>
+                    <br>
+                    <span style="font-size: 90%;">
+                    <i>Используйте, если хотите оставить только акции подходящии требованиям</i>
+                    <i>С активированной опцией выше, товар на FBS перестанет продаваться по цене указанной выше. Поэтому ориентируетесь на цену FBO</i>
+                    <i>Товар исключается из акции для FBO и FBS</i>                                
+                    </span>
+                </div>
+                </label>
+            </div>
+            <input type="text" class="form-control" name="{{ offer_id }}_min_price_promo" id="min_price_promo_{{ offer_id }}" aria-describedby="basic-addon3" value="{{ value.min_price }}" style="width: 150px;" oninput="updatePromoProfitFromInput('{{ offer_id }}')"
+                data-opt-price="{{ value.opt_price }}"
+                data-acquiring="{{ value.acquiring }}"
+                data-sales-percent-fbs="{{ value.sales_percent_fbs }}"
+                data-fbs-deliv-to-customer-amount="{{ value.fbs_deliv_to_customer_amount }}"
+                data-fbs-direct-flow-trans="{{ value.fbs_direct_flow_trans }}"
+                data-fbs-first-mile-avg="{{ value.fbs_first_mile_avg }}"
+                data-sales-percent-fbo="{{ value.sales_percent_fbo }}"
+                data-fbo-direct-flow-trans="{{ value.fbo_direct_flow_trans }}"
+                data-fbo-deliv-to-customer-amount="{{ value.fbo_deliv_to_customer_amount }}"
+            />
+            <div class="d-flex align-items-center" style="margin-top: 10px;">
+                <span class="ms-4">
+                Цена: <span id="discounted_price_promo_{{ offer_id }}">{{ value.min_price }}</span>
+                </span>
+                <span class="ms-4" id="fbs_commission_profit_promo_{{ offer_id }}">
+                Комиссия FBS: {{ value.fbs_delivery_total }}<br>
+                Прибыль FBS: {{ value.profit_price_fbs }} ({{ value.profit_percent_fbs }}%)
+                </span>
+                <span class="ms-4" id="fbo_commission_profit_promo_{{ offer_id }}">
+                Комиссия FBO: {{ value.fbo_delivery_total }}<br>
+                Прибыль FBO: {{ value.profit_price_fbo }} ({{ value.profit_percent_fbo }}%)
+                </span>
+            </div>
+            <hr>
+            <div class="mt-2" id="fbs_debug_promo_{{ offer_id }}" style="font-size: 12px; color: #888;"></div>
+            <br><br>
+            </td>
+        </tr>
+        <script>
+        function updatePromoProfitFromInput(offerId) {
+            let priceInput = document.querySelector('input[name="' + offerId + '_min_price_promo"]');
+            let discounted = parseFloat(priceInput.value.replace(',', '.')) || 0;
+            document.getElementById('discounted_price_promo_' + offerId).innerText = discounted;
+
+            let optPrice = parseFloat(priceInput.getAttribute('data-opt-price')) || 0;
+            let acquiring = parseFloat(priceInput.getAttribute('data-acquiring')) || 0;
+
+            // FBS
+            let salesPercentFbs = parseFloat(priceInput.getAttribute('data-sales-percent-fbs')) || 0;
+            let fbsDelivToCustomerAmount = parseFloat(priceInput.getAttribute('data-fbs-deliv-to-customer-amount')) || 0;
+            let fbsDirectFlowTransAmount = parseFloat(priceInput.getAttribute('data-fbs-direct-flow-trans')) || 0;
+            let fbsFirstMileAvg = parseFloat(priceInput.getAttribute('data-fbs-first-mile-avg')) || 0;
+
+            // FBO
+            let salesPercentFbo = parseFloat(priceInput.getAttribute('data-sales-percent-fbo')) || 0;
+            let fboDirectFlowTrans = parseFloat(priceInput.getAttribute('data-fbo-direct-flow-trans')) || 0;
+            let fboDelivToCustomerAmount = parseFloat(priceInput.getAttribute('data-fbo-deliv-to-customer-amount')) || 0;
+
+            let marketing_seller_price = discounted;
+
+            // FBS calculation
+            let fbs_delivery_total = 
+            (marketing_seller_price * (salesPercentFbs / 100)) +
+            (marketing_seller_price * (acquiring / 100)) +
+            fbsDirectFlowTransAmount +
+            fbsDelivToCustomerAmount +
+            fbsFirstMileAvg;
+
+            fbs_delivery_total = Math.round(fbs_delivery_total);
+
+            let profit_price_fbs = Math.round(discounted - fbs_delivery_total - optPrice);
+            let profit_percent_fbs = optPrice !== 0 ? Math.round(profit_price_fbs / optPrice * 100) : 0;
+
+            document.getElementById('fbs_commission_profit_promo_' + offerId).innerHTML =
+            'Комиссия FBS: ' + fbs_delivery_total + '<br>' +
+            'Прибыль FBS: ' + profit_price_fbs + ' (' + profit_percent_fbs + '%)';
+
+            // FBO calculation
+            let fbo_delivery_total = 
+            (marketing_seller_price * (salesPercentFbo / 100)) +
+            (marketing_seller_price * (acquiring / 100)) +
+            fboDirectFlowTrans +
+            fboDelivToCustomerAmount;
+
+            fbo_delivery_total = Math.round(fbo_delivery_total);
+
+            let profit_price_fbo = Math.round(discounted - fbo_delivery_total - optPrice);
+            let profit_percent_fbo = optPrice !== 0 ? Math.round(profit_price_fbo / optPrice * 100) : 0;
+
+            document.getElementById('fbo_commission_profit_promo_' + offerId).innerHTML =
+            'Комиссия FBO: ' + fbo_delivery_total + '<br>' +
+            'Прибыль FBO: ' + profit_price_fbo + ' (' + profit_percent_fbo + '%)';
+
+            // Debug output
+            document.getElementById('fbs_debug_promo_' + offerId).innerHTML =
+            '<b>DEBUG:</b><br>' +
+            'Цена: ' + marketing_seller_price + '<br>' +
+            'optPrice: ' + optPrice + '<br>' +
+            'acquiring: ' + acquiring + '<br>' +
+            'salesPercentFbs: ' + salesPercentFbs + '<br>' +
+            'fbsDelivToCustomerAmount: ' + fbsDelivToCustomerAmount + '<br>' +
+            'fbsDirectFlowTransAmount: ' + fbsDirectFlowTransAmount + '<br>' +
+            'fbsFirstMileAvg: ' + fbsFirstMileAvg + '<br>' +
+            'fbs_delivery_total: ' + fbs_delivery_total + '<br>' +
+            'salesPercentFbo: ' + salesPercentFbo + '<br>' +
+            'fboDirectFlowTrans: ' + fboDirectFlowTrans + '<br>' +
+            'fboDelivToCustomerAmount: ' + fboDelivToCustomerAmount + '<br>' +
+            'fbo_delivery_total: ' + fbo_delivery_total + '<br>';
+        }
+
+        // Автоматически показать дебаг при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            updatePromoProfitFromInput('{{ offer_id }}');
+        });
+        </script>
+
+
+
+
+
         <tr>
             <td colspan="6" style="height: 24px; background: transparent; border: none;"></td>
         </tr>
