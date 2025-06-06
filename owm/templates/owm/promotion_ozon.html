@@ -65,8 +65,12 @@ function input() {
     <tbody>
 
     {% for offer_id, value in price.items %}
-        <tr id="{{ offer_id }}" class="fw-bold fs-6 text-gray-800 border-gray-400 {{ value.sale_qty|get_row_class }}">
-            <td>{{ offer_id }}</td>
+        {% with row_class=value.profit_percent_fbs|sale_qty_get_row_class %}
+        <tr id="{{ offer_id }}" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.0 }};">
+        {% endwith %}
+            <td>
+                <h1>{{ offer_id }}</h1>                
+            </td>
             <td>Текущая акция {{ value.marketing_seller_price }}</td>
             <td>
                 FBS: {{ value.fbs_delivery_total }}<br>
@@ -91,7 +95,10 @@ function input() {
         </tr>
         
         <!-- Здесь можно добавить дополнительные строки или элементы для каждой строки товара, если нужно -->
-        <tr id="{{ offer_id }}_fbs_control" class="fw-bold fs-6 text-gray-800 border-gray-400 {{ value.sale_qty|get_row_class }}">
+        {% with row_class=value.profit_percent_fbs|sale_qty_get_row_class %}
+        <tr id="{{ offer_id }}_fbs_control" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.1 }};">
+        {% endwith %}
+        
             <td colspan="6">
             <input type="hidden" id="{{ offer_id }}_fbs_control" name="{{ offer_id }}_fbs_control" value="{{ offer_id }}" />
             <a href="https://seller.ozon.ru/app/prices/manager/{{ value.product_id }}/prices">Посмотреть цену товара в личном кабинете ozon</a>
@@ -134,7 +141,9 @@ function input() {
         </tr>
 
         <!-- Дублированный блок для limit_count -->
-        <tr id="{{ offer_id }}_limit_count" class="fw-bold fs-6 text-gray-800 border-gray-400 {{ value.sale_qty|get_row_class }}">
+        {% with row_class=value.profit_percent_fbs|sale_qty_get_row_class %}
+        <tr id="{{ offer_id }}_limit_count" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.1 }};">
+        {% endwith %} 
             <td colspan="6">
             <input type="hidden" id="{{ offer_id }}_limit_count" name="{{ offer_id }}_limit_count" value="{{ offer_id }}" />            
             <br>
@@ -222,8 +231,9 @@ function input() {
         });
         </script>
 
-
-        <tr id="{{ offer_id }}_promo" class="fw-bold fs-6 text-gray-800 border-gray-400 {{ value.sale_qty|get_row_class }}">
+        {% with row_class=value.profit_percent_fbs|sale_qty_get_row_class %}
+        <tr id="{{ offer_id }}_promo" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.1 }};">
+        {% endwith %} 
             <td colspan="6">
             <input type="hidden" id="{{ offer_id }}_promo" name="{{ offer_id }}_promo" value="offer_id" />
             <div class="d-flex align-items-start mb-2">

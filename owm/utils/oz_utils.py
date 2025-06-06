@@ -25,6 +25,7 @@ import os
 from collections import defaultdict
 
 import json
+from django.http import JsonResponse
 
 logger_info = logging.getLogger('crm3_info')
 logger_error = logging.getLogger('crm3_error')
@@ -648,13 +649,25 @@ def ozon_get_all_price(headers):
         }
 
         #print(f"ozon_headers: {headers['ozon_headers']}")
-        response_raw = requests.post(url, headers=headers['ozon_headers'], json=data)
+        
         try:
-            response = response_raw.json()
-            #print(f"Ответ сервера: {response}")
-        except Exception as e:
-            print(f"Ошибка декодирования JSON: {e}\nОтвет сервера: {response_raw.text}")
+            response_raw = requests.post(url, headers=headers['ozon_headers'], json=data, timeout=10)
+            try:
+                response = response_raw.json()
+            except Exception as e:
+                return JsonResponse(
+                    {"error": f"Ошибка декодирования JSON: {str(e)}", "response": response_raw.text},
+                    status=503
+                )
+        except requests.exceptions.Timeout:
+            print("Ozon API timeout")
+            logger.warning("Ozon API timeout")
             response = {}
+        except requests.exceptions.RequestException as e:
+            print(f"Ozon API general request error: {e}")
+            logger.warning(f"Ozon API general request error: {e}")
+            response = {}        
+                
         #print(f"utils.py | get_all_price_ozon | response: {response}")
         realization = {}
         for item in response.get('result', {}).get('rows', []):
@@ -679,23 +692,34 @@ def ozon_get_all_price(headers):
                 "limit": 1000
             }
         
-        response_raw = requests.post(url, headers=headers['ozon_headers'], json=data)
         try:
-            response = response_raw.json()
-            #print(f"Ответ сервера: {response}")
-        except Exception as e:
-            print(f"Ошибка декодирования JSON: {e}\nОтвет сервера: {response_raw.text}")
+            response_raw = requests.post(url, headers=headers['ozon_headers'], json=data, timeout=10)
+            try:
+                response = response_raw.json()
+            except Exception as e:
+                return JsonResponse(
+                    {"error": f"Ошибка декодирования JSON: {str(e)}", "response": response_raw.text},
+                    status=503
+                )
+        except requests.exceptions.Timeout:
+            print("Ozon API timeout")
+            logger_info.info("Ozon API timeout")
             response = {}
-        
+        except requests.exceptions.RequestException as e:
+            print(f"Ozon API general request error: {e}")
+            logger_error.error(f"Ozon API general request error: {e}")
+            response = {}
         #print(f"response {response['result']['items'][0]}")
         result = {}
+        if 'items' not in response:
+            return {'error': response}
         for item in response['items']:
             #print(f'item {item}')
             if item['offer_id'] not in opt_price_clear:
                 continue
             if item['offer_id'] not in realization:
-                realization[item['offer_id']] = {'sale_qty': 0}
-                
+                realization[item['offer_id']] = {'sale_qty': 0}  
+                             
             marketing_seller_price = float(item['price']['marketing_seller_price']) # это минимальная цена которую тебе зачислит озон
             
             acquiring = 2
@@ -736,21 +760,21 @@ def ozon_get_all_price(headers):
                 + float(fbs_deliv_to_customer_amount) \
                 + fbs_first_mile_avg            
 
-            print(f"offer_id: {item['offer_id']}")
-            print(f"marketing_seller_price: {marketing_seller_price}")
-            print(f"min_price: {min_price}")
-            print(f"acquiring clear: {acquiring}")                                    
-            print(f"acquiring %: {(marketing_seller_price * float(acquiring) / 100)}")
-            print(f"fbs_delivery_total: {fbs_delivery_total}")
-            print(f"sales_percent_fbs: {sales_percent_fbs}")
-            print(f"fbs_deliv_to_customer_amount: {fbs_deliv_to_customer_amount}")
-            print(f"fbs_direct_flow_trans: {fbs_direct_flow_trans}")
-            print(f"fbs_first_mile_avg: {fbs_first_mile_avg}")
-            print(f"fbs_return_flow_amount: {fbs_return_flow_amount}")
-            print(f"fbo_deliv_to_customer_amount: {fbo_deliv_to_customer_amount}")
-            print(f"fbo_direct_flow_trans: {fbo_direct_flow_trans}")
-            print(f"fbo_return_flow_amount: {fbo_return_flow_amount}")
-            print(f"sales_percent_fbo: {sales_percent_fbo}")
+            # print(f"offer_id: {item['offer_id']}")
+            # print(f"marketing_seller_price: {marketing_seller_price}")
+            # print(f"min_price: {min_price}")
+            # print(f"acquiring clear: {acquiring}")                                    
+            # print(f"acquiring %: {(marketing_seller_price * float(acquiring) / 100)}")
+            # print(f"fbs_delivery_total: {fbs_delivery_total}")
+            # print(f"sales_percent_fbs: {sales_percent_fbs}")
+            # print(f"fbs_deliv_to_customer_amount: {fbs_deliv_to_customer_amount}")
+            # print(f"fbs_direct_flow_trans: {fbs_direct_flow_trans}")
+            # print(f"fbs_first_mile_avg: {fbs_first_mile_avg}")
+            # print(f"fbs_return_flow_amount: {fbs_return_flow_amount}")
+            # print(f"fbo_deliv_to_customer_amount: {fbo_deliv_to_customer_amount}")
+            # print(f"fbo_direct_flow_trans: {fbo_direct_flow_trans}")
+            # print(f"fbo_return_flow_amount: {fbo_return_flow_amount}")
+            # print(f"sales_percent_fbo: {sales_percent_fbo}")
 
             # Для FBO
             profit_price_fbo = int(marketing_seller_price) - int(fbo_delivery_total) - opt_price_value

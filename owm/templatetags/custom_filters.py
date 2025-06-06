@@ -3,13 +3,13 @@ from django import template
 register = template.Library()
 
 @register.filter
-def get_row_class(sale_qty):
-    if sale_qty < 1:
-        return "alert-danger"
-    elif sale_qty < 10:
-        return "alert-warning"
+def sale_qty_get_row_class(percent):
+    if percent < 30:
+        return ["#ffc0d3", "#fddbe5"]
+    elif percent < 60:
+        return ["#eef3ac", "#f6f8d1"]
     else:
-        return "alert-success"
+        return ["#bff5a6", "#e4fada"]
 
 @register.filter
 def get_item(dictionary, key):

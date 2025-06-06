@@ -19,6 +19,8 @@ from django.contrib import admin
 from django.urls import path, include
 from plugins import settings_plugin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+from django.views.generic import RedirectView
+from django.contrib.staticfiles.storage import staticfiles_storage
 
 
 urlpatterns = [
@@ -39,6 +41,8 @@ urlpatterns += staticfiles_urlpatterns()
 
 if settings.DEBUG:
     import debug_toolbar
+    urlpatterns += [
+    path("favicon.ico", RedirectView.as_view(url=staticfiles_storage.url("assets/media/logos/favicon.ico"))),]
     urlpatterns += [path('__debug__/', include(debug_toolbar.urls)),]
     urlpatterns += static(settings.MEDIA_URL, document_root = settings.MEDIA_ROOT)
 

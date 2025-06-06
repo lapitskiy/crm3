@@ -530,8 +530,7 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
 
                #print(f'*' * 40)
                #print(f'wb_found_product {wb_found_product}')
-               #print(f'* ' * 40)
-               
+               #print(f'* ' * 40)               
                if wb_all_status:
                    #print(f'wb_all_status {wb_all_status}')
                    if wb_all_status.get('sorted'): # доставлется (отгружено)         
@@ -541,7 +540,7 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
                    if wb_all_status.get('sold'):
                        ms_create_sold(headers=headers, seller=seller, market='wb', orders=wb_all_status['sold'])
                        #print('продано')
-                   if wb_all_status.get('canceled'):
+                   if wb_all_status.get('canceled'):                       
                        ms_create_canceled(headers=headers, seller=seller, market='wb', orders=wb_all_status['canceled'])
                        #print('отменено')
 
