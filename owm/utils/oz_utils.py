@@ -741,7 +741,7 @@ def ozon_get_all_price(headers):
             # Среднее значение магистрали для FBS и FBO
             fbs_direct_flow_trans = (float(fbs_direct_flow_trans_max_amount) + float(fbs_direct_flow_trans_min_amount)) / 2
             fbo_direct_flow_trans = (float(fbo_direct_flow_trans_max_amount) + float(fbo_direct_flow_trans_min_amount)) / 2
-            fbs_first_mile_avg = (float(fbs_first_mile_max_amount) + float(fbs_first_mile_min_amount)) / 2
+            fbs_first_mile_avg = float(fbs_first_mile_max_amount)
 
             opt_price_value = opt_price_clear[item['offer_id']]['opt_price']
             

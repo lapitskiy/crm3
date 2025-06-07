@@ -69,14 +69,15 @@ function input() {
         <tr id="{{ offer_id }}" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.0 }};">
         {% endwith %}
             <td>
-                <h1>{{ offer_id }}</h1>                
+                <h1>{{ offer_id }}</h1>
+                продано за месяц {{ value.sale_qty }}
             </td>
             <td>Текущая акция {{ value.marketing_seller_price }}</td>
             <td>
                 FBS: {{ value.fbs_delivery_total }}<br>
                 FBO: {{ value.fbo_delivery_total }}
             </td>
-            <td>{{ value.opt_price }}</td>
+            <td>{{ value.opt_price }}</td>            
             <td>
                 FBS: {{ value.profit_price_fbs }} 
                 {% if value.profit_percent_fbs > 0 %}
