@@ -49,6 +49,11 @@ services:
   celery:  # Celery Worker
     restart: unless-stopped
     image: crm3:latest
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m" # Максимальный размер одного файла лога (например, 10 мегабайт)
+        max-file: "3"  # Максимальное количество файлов логов для хранения    
     command: celery -A crm3 worker --pool=prefork --loglevel=info
     environment:
       - DATABASE_NAME=postgres

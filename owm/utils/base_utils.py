@@ -445,6 +445,7 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
     cron_active_mp['wb'] = True
     cron_active_mp['yandex'] = True
     ms_update = False
+    result = {}
 
     if cron_active_mp['ozon']:
 
@@ -600,7 +601,10 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
 
     if ms_update:
         ms_update_allstock_to_mp(headers=headers, seller=seller)
-
+        
+    if 'error' in wb_fbs_dict:
+        result['wb_error'] = wb_fbs_dict['error']
+    return result
 """
 async 
 Auto Update function
@@ -637,6 +641,7 @@ def autoupdate_sync_inventory(cron_id):
                 seller=cron.seller,
                 cron_active_mp=cron_active_mp
             )
+            print(f"result_update_awaiting {result_update_awaiting}")
             return result_update_awaiting
         else:
             return 'No active'

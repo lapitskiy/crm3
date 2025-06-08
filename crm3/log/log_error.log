@@ -1,0 +1,55 @@
+2025-06-08 05:21:48,243 ERROR [wb_get_status_fbs]: ошибка response ответа - {
+    "title": "unauthorized",
+    "detail": "token expired; Manage tokens at https://seller.wildberries.ru/supplier-settings/access-to-api",
+    "code": "167251cb759b cc73ad3617b9d5c82732 456760352e0e-60",
+    "requestId": "1e16fae06cf40d40568936d6527a7c47",
+    "origin": "s2s-api-auth-marketplace",
+    "status": 401,
+    "statusText": "Unauthorized",
+    "timestamp": "2025-06-08T02:21:47Z"
+}
+
+2025-06-08 05:22:30,111 ERROR [wb_get_status_fbs]: ошибка response ответа - {
+    "title": "unauthorized",
+    "detail": "token expired; Manage tokens at https://seller.wildberries.ru/supplier-settings/access-to-api",
+    "code": "167251cb759b cc73ad3617b9d5c82732 456760352e0e-60",
+    "requestId": "92579f4bb361a17bd4c5cd8e39313153",
+    "origin": "s2s-api-auth-marketplace",
+    "status": 401,
+    "statusText": "Unauthorized",
+    "timestamp": "2025-06-08T02:22:28Z"
+}
+
+2025-06-08 05:22:44,677 ERROR [wb_get_status_fbs]: ошибка response ответа - {
+    "title": "unauthorized",
+    "detail": "token expired; Manage tokens at https://seller.wildberries.ru/supplier-settings/access-to-api",
+    "code": "167251cb759b cc73ad3617b9d5c82732 456760352e0e-60",
+    "requestId": "313032a9d1b5c4f37d5d4fead36a12c3",
+    "origin": "s2s-api-auth-marketplace",
+    "status": 401,
+    "statusText": "Unauthorized",
+    "timestamp": "2025-06-08T02:22:43Z"
+}
+
+2025-06-08 05:22:54,262 ERROR [wb_get_status_fbs]: ошибка response ответа - {
+    "title": "unauthorized",
+    "detail": "token expired; Manage tokens at https://seller.wildberries.ru/supplier-settings/access-to-api",
+    "code": "167251cb759b cc73ad3617b9d5c82732 456760352e0e-60",
+    "requestId": "fe3705174b361885cd325a3601a70c3d",
+    "origin": "s2s-api-auth-marketplace",
+    "status": 401,
+    "statusText": "Unauthorized",
+    "timestamp": "2025-06-08T02:22:53Z"
+}
+
+2025-06-08 05:23:04,821 ERROR [wb_get_status_fbs]: ошибка response ответа - {
+    "title": "unauthorized",
+    "detail": "token expired; Manage tokens at https://seller.wildberries.ru/supplier-settings/access-to-api",
+    "code": "167251cb759b cc73ad3617b9d5c82732 456760352e0e-60",
+    "requestId": "650ad8716f8a8b8879678193e48db58f",
+    "origin": "s2s-api-auth-marketplace",
+    "status": 401,
+    "statusText": "Unauthorized",
+    "timestamp": "2025-06-08T02:23:03Z"
+}
+

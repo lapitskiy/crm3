@@ -154,9 +154,10 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
         else:
             #print(f'#' * 40)
             #print(f'#' * 40)
-            logger_error.error(f"wb_get_awaiting_fbs: ошибка ответа - {response.text}")
+            logger_error.error(f"[wb_get_status_fbs]: ошибка response ответа - {response.text}")
             #print(f"response_json response.text: {response.text}")
             result['error'] = response.text
+            return result
     except Exception as e:
         result['error'] = f"Error in awaiting request: {e}"
 
@@ -167,6 +168,17 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
     all_status = {
         "orders": [order["id"] for order in all_orders["orders"]]
     }
+    
+    
+    if "orders" in all_orders and isinstance(all_orders["orders"], list):
+        all_status = {
+            "orders": [order["id"] for order in all_orders["orders"]]
+        }
+    else:
+        logger_error.error(f"[wb_get_status_fbs]: ключ 'orders' отсутствует в ответе: {all_orders}")
+        result['error'] = f"Ключ 'orders' отсутствует в ответе: {all_orders}"
+        return result
+    
     new_ids = [int(oid) for oid in db_ids if int(oid) not in all_status["orders"]]
 
     all_status["orders"] = (new_ids + all_status["orders"])[:1000]
@@ -303,8 +315,6 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
     #print(f'%' * 40)
     result['filter_product'] = filtered_result
     return result
-
-
 
 def wb_get_products(headers):
     url_list = "https://content-api.wildberries.ru/content/v2/get/cards/list"
