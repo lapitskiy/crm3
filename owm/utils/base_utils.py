@@ -383,37 +383,6 @@ def get_all_price_yandex(headers):
 
     return result
 
-# обновление цены товара озон
-def update_price_ozon(obj, offer_dict):
-    url = 'https://api-seller.ozon.ru/v1/product/import/prices'
-    parser_data = {
-        'moysklad_api': obj.moysklad_api,
-        'yandex_api': obj.yandex_api,
-        'wildberries_api': v.wildberries_api,
-        'ozon_api': obj.ozon_api,
-    }
-    headers = get_headers(parser_data)
-    ozon_price = []
-    for key, value in offer_dict.items():
-        ozon_price.append({
-            'auto_action_enabled': 'ENABLED',
-            'min_price': str(value['min_price']),
-            'price': str(int(value['min_price']) * 1.3),
-            'offer_id': key,
-            'old_price': str((int(value['min_price']) * 1.3) * 1.5),
-            'price_strategy_enabled': 'DISABLED'
-            })
-
-    for i in range(0, len(ozon_price), 1000): # 1000
-        data = {
-            'prices': ozon_price[i:i+999],
-            #'prices': ozon_price[i:i + 2],
-        }
-        response = requests.post(url, headers=headers['ozon_headers'], json=data)
-        print(f'data {data}')
-        break
-    #print(f'ozon price response {response.status_code}')
-    print(f'ozon price json {response.json()}')
 
 def base_delete_files_with_prefix(directory_path, prefix):
     """
@@ -602,8 +571,7 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
     if ms_update:
         ms_update_allstock_to_mp(headers=headers, seller=seller)
         
-    if 'error' in wb_fbs_dict:
-        result['wb_error'] = wb_fbs_dict['error']
+    result.update = wb_fbs_dict.get('error')
     return result
 """
 async 

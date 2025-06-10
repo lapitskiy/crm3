@@ -20,6 +20,9 @@ from .utils.wb_utils import wb_get_products, wb_get_finance
 from .utils.ya_utils import yandex_get_products
 
 from itertools import chain
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+import json
 
 def get_prod_meta(headers, offer_dict):
     #url = f'https://api.moysklad.ru/api/remap/1.2/entity/assortment?filter=article={article}'
@@ -967,3 +970,48 @@ class FinanceWb(View):
         offer_dict = price_POST_to_offer_dict(request.POST.dict())
         update_price_ozon(parser, offer_dict)
         return render(request, 'owm/finance_ozon.html', context)
+
+
+##### AJAX
+
+@csrf_exempt
+def ajax_request_promo(request):
+    """Handle AJAX promo price update"""
+    if not request.user.is_authenticated:
+        return JsonResponse({'success': False, 'error': 'Not authenticated'}, status=401)
+
+    user_company = getattr(getattr(request.user, 'userprofile', None), 'company', None)
+    seller = Seller.objects.filter(company=user_company).first()
+    if not seller:
+        return JsonResponse({'success': False, 'error': 'Seller not found'}, status=404)
+
+    headers = get_headers(seller)
+
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            
+            market = data.get('market')
+            promo_data = {
+                'offer_id': data.get('offer_id'),
+                'yourprice': data.get('yourprice'),
+                'minprice': data.get('minprice'),
+                'min_price_fbs': data.get('min_price_fbs'),
+                'min_price_limit_count': data.get('min_price_limit_count'),
+                'min_price_promo': data.get('min_price_promo'),
+                'limit_count_value': data.get('limit_count_value'),
+                'disable_fbs': data.get('disable_fbs'),
+                'disable_limit_count': data.get('disable_limit_count'),
+                'disable_promo': data.get('disable_promo'),                                
+            }
+            print(f"offer_id: {offer_id}")
+            print(f"promo_data: {promo_data}")
+            # Здесь логика обновления цены, например:
+            if market == 'ozon':
+                result = ozon_update_promo(promo_data, seller=seller, headers=headers)                
+            # Если все прошло успешно:
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    else:
+        return JsonResponse({'success': False, 'error': 'Invalid request method'})

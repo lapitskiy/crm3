@@ -1,7 +1,7 @@
 from django.urls import path
 
 from .views import Enter, Inventory, PriceOzon, PriceWb, PriceYandex, FinanceOzon, PostavkaOzon, FinanceWb, AutoupdateSettings, OtpravlenieOzon, PromotionOzon, SettingsApi, \
-    SettingsContragent, SettingsStorage, SettingsStatus, MSMatchingArticle, SettingsMatchingArticle
+    SettingsContragent, SettingsStorage, SettingsStatus, MSMatchingArticle, SettingsMatchingArticle, ajax_request_promo
 
 urlpatterns = [
     path('', SettingsApi.as_view(), name='settings_api'),
@@ -24,6 +24,7 @@ urlpatterns = [
     path('finance_wb/', FinanceWb.as_view(), name='finance_wb'),
     path('price_yandex/', PriceYandex.as_view(), name='price_yandex'),
     path('enter/', Enter.as_view(), name='enter'),
+    path('ajax-request-promo/', ajax_request_promo, name='ajax_request_promo'),
 ]
 
 

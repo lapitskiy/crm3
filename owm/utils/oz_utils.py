@@ -669,19 +669,77 @@ def ozon_get_all_price(headers):
             response = {}        
                 
         #print(f"utils.py | get_all_price_ozon | response: {response}")
+        # Этот код обрабатывает данные о продажах товаров: для каждого offer_id он группирует цены по диапазонам ±10%.
+        # В результате формируется словарь realization с итоговой статистикой по каждому offer_id.
+        # Если цен нет, список avg остаётся пустым.
+
         realization = {}
+        price_accumulator = {}
+        price_groups = {}
+
+        # Собираем все цены для каждого offer_id
         for item in response.get('result', {}).get('rows', []):
             offer_id = item['item'].get('offer_id')
             quantity = item['delivery_commission']['quantity'] if item.get('delivery_commission') and 'quantity' in item['delivery_commission'] else 0
-
-            # Инициализируем, если offer_id нет в realization или оно равно None
+            seller_price_per_instance = item.get('seller_price_per_instance')
+            # Суммируем количество продаж
             if offer_id not in realization or realization[offer_id] is None:
                 realization[offer_id] = {'sale_qty': quantity}
             else:
-                # Добавляем к sale_qty, если offer_id уже существует
                 realization[offer_id]['sale_qty'] = realization[offer_id].get('sale_qty', 0) + quantity
 
-        #print(f"realization {realization}")
+            # Суммируем цену и количество для расчёта средней цены
+            if offer_id not in price_accumulator:
+                price_accumulator[offer_id] = {'total_price': 0, 'count': 0}
+            if seller_price_per_instance is not None:
+                price_accumulator[offer_id]['total_price'] += float(seller_price_per_instance) * quantity
+                price_accumulator[offer_id]['count'] += quantity
+
+            # Собираем все цены (с учетом количества)
+            if offer_id not in price_groups:
+                price_groups[offer_id] = []
+            if seller_price_per_instance is not None:
+                price_groups[offer_id].extend([float(seller_price_per_instance)] * quantity)
+
+        # Вычисляем среднюю цену для каждого offer_id
+        for offer_id, acc in price_accumulator.items():
+            avg_price = acc['total_price'] / acc['count'] if acc['count'] > 0 else 0
+            if offer_id in realization:
+                realization[offer_id]['avg_seller_price'] = int(avg_price)
+            else:
+                realization[offer_id] = {'sale_qty': 0, 'avg_seller_price': int(avg_price)}
+
+        # Убедимся, что у всех offer_id в realization есть avg_seller_price
+        for offer_id in realization:
+            if 'avg_seller_price' not in realization[offer_id]:
+                realization[offer_id]['avg_seller_price'] = 0
+
+        # Группировка цен по диапазону 10% (жадно, без повторов)
+        for offer_id, prices in price_groups.items():
+            if not prices:
+                realization[offer_id]['avg'] = []
+                continue
+            sorted_prices = sorted(prices)
+            used = [False] * len(sorted_prices)
+            groups = []
+            i = 0
+            while i < len(sorted_prices):
+                if used[i]:
+                    i += 1
+                    continue
+                group = [sorted_prices[i]]
+                used[i] = True
+                for j in range(i + 1, len(sorted_prices)):
+                    if not used[j] and abs(sorted_prices[j] - group[0]) / group[0] <= 0.1:
+                        group.append(sorted_prices[j])
+                        used[j] = True
+                groups.append(group)
+                i += 1
+            avg_list = [{len(g): int(sum(g) / len(g))} for g in groups if g]
+            realization[offer_id]['avg'] = avg_list
+
+        #print(f"realization: {realization}")
+        #exit()
 
         url = "https://api-seller.ozon.ru/v5/product/info/prices"
         data = {
@@ -714,7 +772,6 @@ def ozon_get_all_price(headers):
         if 'items' not in response:
             return {'error': response}
         for item in response['items']:
-            #print(f'item {item}')
             if item['offer_id'] not in opt_price_clear:
                 continue
             if item['offer_id'] not in realization:
@@ -723,6 +780,7 @@ def ozon_get_all_price(headers):
             marketing_seller_price = float(item['price']['marketing_seller_price']) # это минимальная цена которую тебе зачислит озон
             
             acquiring = 2
+            price = float(item['price']['price'])
             min_price = float(item['price']['min_price'])
             commissions = item.get('commissions', {})
             sales_percent_fbs = commissions.get('sales_percent_fbs', 0)  # Процент комиссии за продажу (FBS)
@@ -789,12 +847,15 @@ def ozon_get_all_price(headers):
 
             result[item['offer_id']] = {
                 'product_id': int(float(item['product_id'])),
+                'price': int(price),
                 'min_price': int(min_price),
                 'marketing_seller_price': int(marketing_seller_price),
                 'opt_price': opt_price_value,
                 'profit_percent_fbo': int(profit_percent_fbo),
                 'profit_percent_fbs': int(profit_percent_fbs),
                 'sale_qty': realization[item['offer_id']]['sale_qty'],
+                'avg_seller_price': realization[item['offer_id']].get('avg_seller_price', 0),
+                'avg_list': realization[item['offer_id']].get('avg', []),
                 'profit_price_fbo': int(profit_price_fbo),
                 'profit_price_fbs': int(profit_price_fbs),
                 'fbs_delivery_total': int(fbs_delivery_total),
@@ -900,3 +961,32 @@ def ozon_get_postavka(headers: dict):
     result['code'] = 8 if response.get('code') == 8 else 0
     return result
 
+def ozon_update_promo(promo_data, seller, headers):
+    """
+    Updates promotional data for a seller on Ozon.
+    
+    :param promo_data: The promotional data to update.
+    :param seller: The seller for whom the promotion is being updated.
+    :param headers: Headers for the API request.
+    :return: Response from the Ozon API.
+    """
+    url = "https://api-seller.ozon.ru/v1/product/import/prices"                
+    
+    try:
+        response_raw = requests.post(url, headers=headers['ozon_headers'], json=promo_data, timeout=10)
+        try:
+            response = response_raw.json()
+            return JsonResponse({'success': True, 'response': response})
+        
+        except Exception as e:
+            logger_error.error(f"Ошибка декодирования JSON: {str(e)} | response: {response_raw.text}")
+            return JsonResponse({'success': False, 'error': f"Ошибка декодирования JSON: {str(e)}", "response": response_raw.text})
+        except requests.exceptions.Timeout:
+            logger_error.error("Ozon API timeout")
+            return JsonResponse({'success': False, 'error': "Ozon API timeout"})
+        except requests.exceptions.RequestException as e:
+            logger_error.error(f"Ozon API general request error: {e}")
+            return JsonResponse({'success': False, 'error': f"Ozon API general request error: {e}"})
+    except Exception as err:
+        logger_error.error(f"Other error occurred: {err}")
+        return JsonResponse({'success': False, 'error': str(err)})

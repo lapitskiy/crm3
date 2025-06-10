@@ -45,14 +45,14 @@ class Awaiting_product(models.Model):
 
 
 # Ваша логика верная: 
-# 1. Первый класс — настройки для продавца и маркетплейса (PromoMarketSettings).
+# 1. Первый класс — настройки для продавца и маркетплейса (PromoMarket).
 # 2. Второй класс — настройки для каждого товара на этом маркетплейсе (PromoProduct).
 
-class PromoMarketSettings(models.Model):
+class PromoMarket(models.Model):
     """
     Настройки акций для продавца на конкретном маркетплейсе.
     """
-    seller = models.ForeignKey(Seller, on_delete=models.CASCADE, related_name='promo_market_settings')
+    seller = models.ForeignKey(Seller, on_delete=models.CASCADE, related_name='promo_market')
     market = models.CharField(max_length=50, verbose_name='Маркетплейс')
 
     class Meta:
@@ -64,11 +64,16 @@ class PromoProduct(models.Model):
     """
     Настройки участия товара в акциях для конкретного продавца и маркетплейса.
     """
-    promo_market = models.ForeignKey(PromoMarketSettings, on_delete=models.CASCADE, related_name='products')
-    offer_id = models.CharField(max_length=50, verbose_name='ID товара')
-    min_price_fbs = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Мин. цена FBS')
+    promo_market = models.ForeignKey(PromoMarket, on_delete=models.CASCADE, related_name='products')
+    offer_id = models.CharField(max_length=100, verbose_name='ID товара')
+    yourprice = models.IntegerField(null=True, blank=True, verbose_name='Ваша цена')
+    minprice = models.IntegerField(null=True, blank=True, verbose_name='Мин. цена')
+    min_price_fbs = models.IntegerField(null=True, blank=True, verbose_name='Мин. цена FBS')
+    min_price_limit_count = models.IntegerField(null=True, blank=True, verbose_name='Мин. цена для лимита')
+    min_price_promo = models.IntegerField(null=True, blank=True, verbose_name='Мин. цена для акции')
+    limit_count_value = models.IntegerField(null=True, blank=True, verbose_name='Значение лимита')
     disable_fbs = models.BooleanField(default=False, verbose_name='Отключить FBS')
-    min_price_promo = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name='Мин. цена для акции')
+    disable_limit_count = models.BooleanField(default=False, verbose_name='Отключить лимит')
     disable_promo = models.BooleanField(default=False, verbose_name='Отключить участие в акции')
 
     class Meta:

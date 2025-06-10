@@ -48,45 +48,73 @@ function input() {
 <table class="table table-rounded table-row-bordered border gy-7 gs-7">
     <thead>
         <tr class="fw-semibold fs-6 text-gray-800 border-bottom border-gray-400">
-            <th>Артикул</th>
             <th>Актуальная цена</th>
             <th>Комиссия FBS/FBO</th>
-            <th>Оптовая</th>
             <th>Прибыль FBS/FBO</th>
-        </tr>
-        <tr class="fw-semibold fs-6 text-gray-800 border-bottom border-gray-400">
-            <td></td>
-            <td colspan="1"></td>
-            <td colspan="1"></td>
-            <td colspan="1"></td>
-            <td colspan="1" style="font-weight:bold;"></td>
         </tr>
     </thead>
     <tbody>
 
     {% for offer_id, value in price.items %}
         {% with row_class=value.profit_percent_fbs|sale_qty_get_row_class %}
+        <tr id="{{ offer_id }}" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.0 }}; border-top: 4px solid #222;">
+        {% endwith %}
+            <td colspan="4">
+            <span style="font-size: 2rem; font-weight: bold;">{{ offer_id }}</span>
+            <span style="margin-left: 14px;">
+                <i class="fa fa-shopping-cart" aria-hidden="true" style="color:#5ab738;"></i>
+                (продано за месяц {{ value.sale_qty }} шт.)
+            </span>
+            <span style="margin-left: 14px;">
+                <i class="fa fa-cubes" aria-hidden="true" style="color:#007bff;"></i>
+                (опт {{ value.opt_price }} )
+            </span>
+            </td>
+        </tr>   
+         
+
+
+                     
+        {% if value.avg_list %}                    
+            {% for item in value.avg_list %}
+                {% for qty, avg in item.items %}
+                    {% with row_class=value.profit_percent_fbs|sale_qty_get_row_class %}
+                    <tr id="{{ offer_id }}" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.0 }};">
+                    {% endwith %}   
+                        <td>
+                            Продано {{ qty }} по средней цене {{ avg }}
+                        </td>
+                        <td>
+                            Коммисия FBS: / FBO:
+                        </td>          
+                        <td>
+                            прибыль FBS:              
+                            / FBO: 
+                        </td>
+                    </tr>      
+
+                {% endfor %}
+            {% endfor %}
+        {% endif %}
+
+
+                                                  
+        {% with row_class=value.profit_percent_fbs|sale_qty_get_row_class %}
         <tr id="{{ offer_id }}" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.0 }};">
         {% endwith %}
-            <td>
-                <h1>{{ offer_id }}</h1>
-                продано за месяц {{ value.sale_qty }}
-            </td>
+                 
             <td>Текущая акция {{ value.marketing_seller_price }}</td>
             <td>
-                FBS: {{ value.fbs_delivery_total }}<br>
-                FBO: {{ value.fbo_delivery_total }}
-            </td>
-            <td>{{ value.opt_price }}</td>            
+                коммисия FBS: {{ value.fbs_delivery_total }} / FBO: {{ value.fbo_delivery_total }}
+            </td>          
             <td>
-                FBS: {{ value.profit_price_fbs }} 
+                прибыль FBS: {{ value.profit_price_fbs }}
                 {% if value.profit_percent_fbs > 0 %}
                     (<span style="color:#5ab738">{{ value.profit_percent_fbs }}%</span>)
                 {% else %}
                     (<span style="color:#ff2b4a">{{ value.profit_percent_fbs }}%</span>)
-                {% endif %}
-                <br>
-                FBO: {{ value.profit_price_fbo }} 
+                {% endif %}                
+                / FBO: {{ value.profit_price_fbo }} 
                 {% if value.profit_percent_fbo > 0 %}
                     (<span style="color:#5ab738">{{ value.profit_percent_fbo }}%</span>)
                 {% else %}
@@ -94,29 +122,43 @@ function input() {
                 {% endif %}
             </td>
         </tr>
-        
-        <!-- Здесь можно добавить дополнительные строки или элементы для каждой строки товара, если нужно -->
+        {% with row_class=value.profit_percent_fbs|sale_qty_get_row_class %}
+        <tr id="{{ offer_id }}_price" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.1 }};">
+        {% endwith %}
+            <td colspan="6">                
+            <div style="margin-top: 10px; display: flex; align-items: center; gap: 20px;">
+                <span style="min-width: 120px; text-align: right;">Ваша цена без акций:</span>
+                <input type="text" class="form-control d-inline-block" style="width: 180px;" 
+                    name="{{ offer_id }}_yourprice" id="{{ offer_id }}_yourprice" 
+                    placeholder="Ваша цена" value="{{ value.price|default_if_none:'' }}">
+                <span style="min-width: 140px; text-align: right; margin-left: 20px;">Минимальная цена в ozon:</span>
+                <input type="text" class="form-control d-inline-block" style="width: 180px;" 
+                    name="{{ offer_id }}_minprice" id="{{ offer_id }}_minprice" 
+                    placeholder="Минимальная цена" value="{{ value.min_price|default_if_none:'' }}">
+            </div>
+            </td>
+        </tr>
+
         {% with row_class=value.profit_percent_fbs|sale_qty_get_row_class %}
         <tr id="{{ offer_id }}_fbs_control" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.1 }};">
         {% endwith %}
-        
             <td colspan="6">
             <input type="hidden" id="{{ offer_id }}_fbs_control" name="{{ offer_id }}_fbs_control" value="{{ offer_id }}" />
             <a href="https://seller.ozon.ru/app/prices/manager/{{ value.product_id }}/prices">Посмотреть цену товара в личном кабинете ozon</a>
             <br><br>
             <div class="d-flex align-items-start mb-2">
-            <input type="checkbox" id="disable_fbs_{{ offer_id }}" name="disable_fbs_{{ offer_id }}" class="me-2 mt-1">
-            <label for="disable_fbs_{{ offer_id }}" class="form-check-label" style="margin-bottom:0;">
-                <div>
-                <strong>Минимальная цена от текущей, при которой товар перестает продаваться на FBS</strong>
-                <br>
-                <span style="font-size: 90%;">
-                    (выставляется остатки в 0 на FBS)<br>
-                    - <i>используется если товар FBO продавать выгодно, но отгружать FBS не выгодно, а цену не поменять, тогда проще убрать остатки FBS если они по текущей акции не приносят прибыли.</i><br>
-                    - <i>функция активируется, если у товара есть остатки на FBO</i>
-                </span>
-                </div>
-            </label>
+                <input type="checkbox" id="disable_fbs_{{ offer_id }}" name="disable_fbs_{{ offer_id }}" class="me-2 mt-1">
+                <label for="disable_fbs_{{ offer_id }}" class="form-check-label" style="margin-bottom:0;">
+                    <div>
+                    <strong>Минимальная цена от текущей, при которой товар перестает продаваться на FBS</strong>
+                    <br>
+                    <span style="font-size: 90%;">
+                        (выставляется остатки в 0 на FBS)<br>
+                        - <i>используется если товар FBO продавать выгодно, но отгружать FBS не выгодно, а цену не поменять, тогда проще убрать остатки FBS если они по текущей акции не приносят прибыли.</i><br>
+                        - <i>функция активируется, если у товара есть остатки на FBO</i>
+                    </span>
+                    </div>
+                </label>
             </div>
             <input type="text" class="form-control" name="{{ offer_id }}_min_price_fbs" id="min_price_fbs_{{ offer_id }}" aria-describedby="basic-addon3" value="{{ value.min_price }}" style="width: 150px;" oninput="updateFBSProfitFromInput('{{ offer_id }}')"
             data-opt-price="{{ value.opt_price }}"
@@ -127,13 +169,13 @@ function input() {
             data-fbs-first-mile-avg="{{ value.fbs_first_mile_avg }}"
             />
             <div class="d-flex align-items-center" style="margin-top: 10px;">
-            <span class="ms-4">
-            Цена: <span id="discounted_price_{{ offer_id }}">{{ value.min_price }}</span>
-            </span>
-            <span class="ms-4" id="fbs_commission_profit_{{ offer_id }}">
-            Комиссия FBS: {{ value.fbs_delivery_total }}<br>
-            Прибыль FBS: {{ value.profit_price_fbs }} ({{ value.profit_percent_fbs }}%)
-            </span>
+                <span class="ms-4">
+                Цена: <span id="discounted_price_{{ offer_id }}">{{ value.min_price }}</span>
+                </span>
+                <span class="ms-4" id="fbs_commission_profit_{{ offer_id }}">
+                Комиссия FBS: {{ value.fbs_delivery_total }}<br>
+                Прибыль FBS: {{ value.profit_price_fbs }} ({{ value.profit_percent_fbs }}%)
+                </span>
             </div>
             <hr>
             <div class="mt-2" id="fbs_debug_{{ offer_id }}" style="font-size: 12px; color: #888;"></div>
@@ -141,7 +183,6 @@ function input() {
             </td>
         </tr>
 
-        <!-- Дублированный блок для limit_count -->
         {% with row_class=value.profit_percent_fbs|sale_qty_get_row_class %}
         <tr id="{{ offer_id }}_limit_count" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.1 }};">
         {% endwith %} 
@@ -149,16 +190,16 @@ function input() {
             <input type="hidden" id="{{ offer_id }}_limit_count" name="{{ offer_id }}_limit_count" value="{{ offer_id }}" />            
             <br>
             <div class="d-flex align-items-start mb-2">
-            <input type="checkbox" id="disable_limit_count_{{ offer_id }}" name="disable_limit_count_{{ offer_id }}" class="me-2 mt-1">
-            <label for="disable_limit_count_{{ offer_id }}" class="form-check-label" style="margin-bottom:0;">
-                <div>
-                <strong>Если остаток меньше указанного</strong>                
-                <br>
-                <span style="font-size: 90%;">                    
-                    - <i>если товара осталось мало, убираем его из всех акций не соотвествующей указанной цене, если акций нет выставляется "ваша цена" товара</i><br>                    
-                </span>
-                </div>                
-            </label>
+                <input type="checkbox" id="disable_limit_count_{{ offer_id }}" name="disable_limit_count_{{ offer_id }}" class="me-2 mt-1">
+                <label for="disable_limit_count_{{ offer_id }}" class="form-check-label" style="margin-bottom:0;">
+                    <div>
+                    <strong>Если остаток меньше указанного</strong>                
+                    <br>
+                    <span style="font-size: 90%;">                    
+                        - <i>если товара осталось мало, убираем его из всех акций не соотвествующей указанной цене, если акций нет выставляется "ваша цена" товара</i><br>                    
+                    </span>
+                    </div>                
+                </label>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
                 <input type="number" class="form-control" name="{{ offer_id }}_limit_count_value" id="limit_count_value_{{ offer_id }}" value="{{ value.limit_count|default_if_none:1 }}" min="1" style="width: 100px;" placeholder="Кол-во">
@@ -169,68 +210,19 @@ function input() {
                 data-fbs-direct-flow-trans="{{ value.fbs_direct_flow_trans }}" data-fbs-first-mile-avg="{{ value.fbs_first_mile_avg }}">
             </div>
             <div class="d-flex align-items-center" style="margin-top: 10px;">
-            <span class="ms-4">
-            Цена: <span id="discounted_price_limit_count_{{ offer_id }}">{{ value.min_price }}</span>
-            </span>
-            <span class="ms-4" id="fbs_commission_profit_limit_count_{{ offer_id }}">
-            Комиссия FBS: {{ value.fbs_delivery_total }}<br>
-            Прибыль FBS: {{ value.profit_price_fbs }} ({{ value.profit_percent_fbs }}%)
-            </span>
+                <span class="ms-4">
+                Цена: <span id="discounted_price_limit_count_{{ offer_id }}">{{ value.min_price }}</span>
+                </span>
+                <span class="ms-4" id="fbs_commission_profit_limit_count_{{ offer_id }}">
+                Комиссия FBS: {{ value.fbs_delivery_total }}<br>
+                Прибыль FBS: {{ value.profit_price_fbs }} ({{ value.profit_percent_fbs }}%)
+                </span>
             </div>
             <hr>
             <div class="mt-2" id="fbs_debug_limit_count_{{ offer_id }}" style="font-size: 12px; color: #888;"></div>
             <br><br>
             </td>
         </tr>
-        <script>
-        function updateLimitCountProfitFromInput(offerId) {
-            let priceInput = document.querySelector('input[name="' + offerId + '_min_price_limit_count"]');
-            let discounted = parseFloat(priceInput.value.replace(',', '.')) || 0;
-            document.getElementById('discounted_price_limit_count_' + offerId).innerText = discounted;
-
-            let optPrice = parseFloat(priceInput.getAttribute('data-opt-price')) || 0;
-            let acquiring = parseFloat(priceInput.getAttribute('data-acquiring')) || 0;
-            let salesPercentFbs = parseFloat(priceInput.getAttribute('data-sales-percent-fbs')) || 0;
-            let fbsDelivToCustomerAmount = parseFloat(priceInput.getAttribute('data-fbs-deliv-to-customer-amount')) || 0;
-            let fbsDirectFlowTransAmount = parseFloat(priceInput.getAttribute('data-fbs-direct-flow-trans')) || 0;
-            let fbs_first_mile_avg = parseFloat(priceInput.getAttribute('data-fbs-first-mile-avg')) || 0;
-
-            let marketing_seller_price = discounted;
-
-            let fbs_delivery_total = 
-            (marketing_seller_price * (salesPercentFbs / 100)) +
-            (marketing_seller_price * (acquiring / 100)) +
-            fbsDirectFlowTransAmount +
-            fbsDelivToCustomerAmount +
-            fbs_first_mile_avg;
-
-            fbs_delivery_total = Math.round(fbs_delivery_total);
-
-            let profit_price_fbs = Math.round(discounted - fbs_delivery_total - optPrice);
-            let profit_percent_fbs = optPrice !== 0 ? Math.round(profit_price_fbs / optPrice * 100) : 0;
-
-            document.getElementById('fbs_commission_profit_limit_count_' + offerId).innerHTML =
-            'Комиссия FBS: ' + fbs_delivery_total + '<br>' +
-            'Прибыль FBS: ' + profit_price_fbs + ' (' + profit_percent_fbs + '%)';
-
-            // Debug output
-            document.getElementById('fbs_debug_limit_count_' + offerId).innerHTML =
-            '<b>DEBUG:</b><br>' +
-            'Цена: ' + marketing_seller_price + '<br>' +
-            'optPrice: ' + optPrice + '<br>' +
-            'acquiring: ' + acquiring + '<br>' +
-            'salesPercentFbs: ' + salesPercentFbs + '<br>' +
-            'fbsDelivToCustomerAmount: ' + fbsDelivToCustomerAmount + '<br>' +
-            'fbsDirectFlowTransAmount: ' + fbsDirectFlowTransAmount + '<br>' +
-            'fbs_first_mile_avg: ' + fbs_first_mile_avg + '<br>' +
-            'fbs_delivery_total: ' + fbs_delivery_total + '<br>';
-        }
-
-        // Автоматически показать дебаг при загрузке страницы
-        document.addEventListener('DOMContentLoaded', function() {
-            updateLimitCountProfitFromInput('{{ offer_id }}');
-        });
-        </script>
 
         {% with row_class=value.profit_percent_fbs|sale_qty_get_row_class %}
         <tr id="{{ offer_id }}_promo" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.1 }};">
@@ -277,9 +269,80 @@ function input() {
             </div>
             <hr>
             <div class="mt-2" id="fbs_debug_promo_{{ offer_id }}" style="font-size: 12px; color: #888;"></div>
-            <br><br>
+            <br>
+            <!-- Кнопка обновления для всех полей и чекбоксов -->
+            <button type="button" class="btn btn-success d-inline-flex align-items-center ms-3" id="update_all_btn_{{ offer_id }}" onclick="updateAllFieldsAjax('{{ offer_id }}')">
+                <span class="spinner-border spinner-border-sm me-2 d-none" id="spinner_all_{{ offer_id }}" role="status" aria-hidden="true"></span>
+                Обновить все параметры
+            </button>
             </td>
         </tr>
+        <script>
+        function updateAllFieldsAjax(offerId) {
+            var btn = document.getElementById('update_all_btn_' + offerId);
+            var spinner = document.getElementById('spinner_all_' + offerId);
+
+            // Собираем все значения input и checkbox для данного offerId
+            var data = {
+                offer_id: offerId,
+                yourprice: document.getElementById(offerId + '_yourprice')?.value || '',
+                minprice: document.getElementById(offerId + '_minprice')?.value || '',
+                min_price_fbs: document.getElementById('min_price_fbs_' + offerId)?.value || '',
+                min_price_limit_count: document.getElementById('min_price_limit_count_' + offerId)?.value || '',
+                min_price_promo: document.getElementById('min_price_promo_' + offerId)?.value || '',
+                limit_count_value: document.getElementById('limit_count_value_' + offerId)?.value || '',
+                disable_fbs: document.getElementById('disable_fbs_' + offerId)?.checked || false,
+                disable_limit_count: document.getElementById('disable_limit_count_' + offerId)?.checked || false,
+                disable_promo: document.getElementById('disable_promo_' + offerId)?.checked || false,
+                market: "ozon"
+            };
+
+            spinner.classList.remove('d-none');
+            btn.disabled = true;
+
+            fetch("{% url 'ajax_request_promo' %}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": "{{ csrf_token }}",
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                spinner.classList.add('d-none');
+                btn.disabled = false;
+                if (data.success) {
+                    showToast('Параметры обновлены для товара: ' + offerId);
+                } else {
+                    showToast((data.error || 'Ошибка при обновлении параметров') + ' (Товар: ' + offerId + ')');
+                }
+            })
+            .catch(error => {
+                spinner.classList.add('d-none');
+                btn.disabled = false;
+                showToast('Ошибка при обновлении параметров (Товар: ' + offerId + ')');
+            });
+        }
+
+        // Всплывающее окно
+        function showToast(message) {
+            let toast = document.createElement('div');
+            toast.innerText = message;
+            toast.style.position = 'fixed';
+            toast.style.bottom = '30px';
+            toast.style.right = '30px';
+            toast.style.background = '#28a745';
+            toast.style.color = '#fff';
+            toast.style.padding = '12px 24px';
+            toast.style.borderRadius = '6px';
+            toast.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+            toast.style.zIndex = 9999;
+            toast.style.opacity = '0.65';
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.remove(); }, 2000);
+        }
+        </script>
         <script>
         function updatePromoProfitFromInput(offerId) {
             let priceInput = document.querySelector('input[name="' + offerId + '_min_price_promo"]');
