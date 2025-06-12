@@ -75,25 +75,32 @@ function input() {
 
 
                      
-        {% if value.avg_list %}                    
+        {% if value.avg_list %}
             {% for item in value.avg_list %}
-                {% for qty, avg in item.items %}
-                    {% with row_class=value.profit_percent_fbs|sale_qty_get_row_class %}
-                    <tr id="{{ offer_id }}" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.0 }};">
-                    {% endwith %}   
-                        <td>
-                            Продано {{ qty }} по средней цене {{ avg }}
-                        </td>
-                        <td>
-                            Коммисия FBS: / FBO:
-                        </td>          
-                        <td>
-                            прибыль FBS:              
-                            / FBO: 
-                        </td>
-                    </tr>      
-
-                {% endfor %}
+            {% with row_class=item.profit_percent_fbs|sale_qty_get_row_class %}
+            <tr id="{{ offer_id }}_avg_{{ forloop.counter }}" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.0 }};">
+                <td>
+            {% endwith %}
+                Продано {{ item.count }} по средней цене {{ item.avg_price }}
+                </td>
+                <td>
+                Комиссия FBS: {{ item.fbs_delivery_total }} / FBO: {{ item.fbo_delivery_total }}
+                </td>
+                <td>
+                прибыль FBS: {{ item.profit_price_fbs }}
+                {% if item.profit_percent_fbs > 0 %}
+                    (<span style="color:#5ab738">{{ item.profit_percent_fbs }}%</span>)
+                {% else %}
+                    (<span style="color:#ff2b4a">{{ item.profit_percent_fbs }}%</span>)
+                {% endif %}
+                / FBO: {{ item.profit_price_fbo }}
+                {% if item.profit_percent_fbo > 0 %}
+                    (<span style="color:#5ab738">{{ item.profit_percent_fbo }}%</span>)
+                {% else %}
+                    (<span style="color:#ff2b4a">{{ item.profit_percent_fbo }}%</span>)
+                {% endif %}
+                </td>
+            </tr>
             {% endfor %}
         {% endif %}
 
@@ -273,7 +280,7 @@ function input() {
             <!-- Кнопка обновления для всех полей и чекбоксов -->
             <button type="button" class="btn btn-success d-inline-flex align-items-center ms-3" id="update_all_btn_{{ offer_id }}" onclick="updateAllFieldsAjax('{{ offer_id }}')">
                 <span class="spinner-border spinner-border-sm me-2 d-none" id="spinner_all_{{ offer_id }}" role="status" aria-hidden="true"></span>
-                Обновить все параметры
+                Обновить параметры {{ offer_id }}
             </button>
             </td>
         </tr>

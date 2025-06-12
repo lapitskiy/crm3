@@ -738,9 +738,6 @@ def ozon_get_all_price(headers):
             avg_list = [{len(g): int(sum(g) / len(g))} for g in groups if g]
             realization[offer_id]['avg'] = avg_list
 
-        #print(f"realization: {realization}")
-        #exit()
-
         url = "https://api-seller.ozon.ru/v5/product/info/prices"
         data = {
             "filter": {
@@ -818,32 +815,44 @@ def ozon_get_all_price(headers):
                 + float(fbs_deliv_to_customer_amount) \
                 + fbs_first_mile_avg            
 
-            # print(f"offer_id: {item['offer_id']}")
-            # print(f"marketing_seller_price: {marketing_seller_price}")
-            # print(f"min_price: {min_price}")
-            # print(f"acquiring clear: {acquiring}")                                    
-            # print(f"acquiring %: {(marketing_seller_price * float(acquiring) / 100)}")
-            # print(f"fbs_delivery_total: {fbs_delivery_total}")
-            # print(f"sales_percent_fbs: {sales_percent_fbs}")
-            # print(f"fbs_deliv_to_customer_amount: {fbs_deliv_to_customer_amount}")
-            # print(f"fbs_direct_flow_trans: {fbs_direct_flow_trans}")
-            # print(f"fbs_first_mile_avg: {fbs_first_mile_avg}")
-            # print(f"fbs_return_flow_amount: {fbs_return_flow_amount}")
-            # print(f"fbo_deliv_to_customer_amount: {fbo_deliv_to_customer_amount}")
-            # print(f"fbo_direct_flow_trans: {fbo_direct_flow_trans}")
-            # print(f"fbo_return_flow_amount: {fbo_return_flow_amount}")
-            # print(f"sales_percent_fbo: {sales_percent_fbo}")
-
             # Для FBO
             profit_price_fbo = int(marketing_seller_price) - int(fbo_delivery_total) - opt_price_value
             # Для FBS
             profit_price_fbs = int(marketing_seller_price) - int(fbs_delivery_total) - opt_price_value
-                                                                    
 
             profit_percent_fbo = profit_price_fbo / opt_price_value * 100 if opt_price_value != 0 else 0
             profit_percent_fbs = profit_price_fbs / opt_price_value * 100 if opt_price_value != 0 else 0
 
-            
+            # --- Calculate for each avg in avg_list ---
+            avg_list = []
+            for avg_entry in realization[item['offer_id']].get('avg', []):
+                # avg_entry is like {6: 168}
+                count, avg_price = next(iter(avg_entry.items()))
+                avg_fbo_delivery_total = (avg_price * float(sales_percent_fbo) / 100) \
+                    + (avg_price * float(acquiring) / 100) \
+                    + float(fbo_direct_flow_trans) \
+                    + float(fbo_deliv_to_customer_amount)
+                avg_fbs_delivery_total = (avg_price * float(sales_percent_fbs) / 100) \
+                    + (avg_price * float(acquiring) / 100) \
+                    + float(fbs_direct_flow_trans) \
+                    + float(fbs_deliv_to_customer_amount) \
+                    + fbs_first_mile_avg
+                avg_profit_price_fbo = int(avg_price) - int(avg_fbo_delivery_total) - opt_price_value
+                avg_profit_price_fbs = int(avg_price) - int(avg_fbs_delivery_total) - opt_price_value
+                avg_profit_percent_fbo = avg_profit_price_fbo / opt_price_value * 100 if opt_price_value != 0 else 0
+                avg_profit_percent_fbs = avg_profit_price_fbs / opt_price_value * 100 if opt_price_value != 0 else 0
+                avg_list.append({
+                    'count': count,
+                    'avg_price': int(avg_price),
+                    'fbo_delivery_total': int(avg_fbo_delivery_total),
+                    'fbs_delivery_total': int(avg_fbs_delivery_total),
+                    'profit_price_fbo': int(avg_profit_price_fbo),
+                    'profit_price_fbs': int(avg_profit_price_fbs),
+                    'profit_percent_fbo': int(avg_profit_percent_fbo),
+                    'profit_percent_fbs': int(avg_profit_percent_fbs),
+                })
+            realization[item['offer_id']]['avg_list'] = avg_list
+                        
 
             result[item['offer_id']] = {
                 'product_id': int(float(item['product_id'])),
@@ -855,7 +864,7 @@ def ozon_get_all_price(headers):
                 'profit_percent_fbs': int(profit_percent_fbs),
                 'sale_qty': realization[item['offer_id']]['sale_qty'],
                 'avg_seller_price': realization[item['offer_id']].get('avg_seller_price', 0),
-                'avg_list': realization[item['offer_id']].get('avg', []),
+                'avg_list': realization[item['offer_id']].get('avg_list', []),
                 'profit_price_fbo': int(profit_price_fbo),
                 'profit_price_fbs': int(profit_price_fbs),
                 'fbs_delivery_total': int(fbs_delivery_total),
