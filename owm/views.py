@@ -749,6 +749,30 @@ class PromotionOzon(View):
         return render(request, 'owm/price_ozon.html', context)
 
 
+class WbPromo(View):
+    def get(self, request, *args, **kwargs):
+        
+        if not request.user.is_authenticated:
+            return redirect('login')  # или другая страница
+
+        user_company = request.user.userprofile.company
+        seller = Seller.objects.filter(company=user_company).first()
+        
+        context = {}
+        
+        headers = get_headers(seller)
+        price = wb_get_all_price(headers)
+        context['price'] = price #dict(list(price.items())[:1]) # price
+        return render(request, 'owm/promotion_ozon.html', context)
+
+    def post(self, request, *args, **kwargs):
+        context = {}
+        parser = Seller.objects.get(user=request.user)
+        offer_dict = price_POST_to_offer_dict(request.POST.dict())
+        update_price_ozon(parser, offer_dict)
+        return render(request, 'owm/price_ozon.html', context)    
+
+
 class PriceWb(View):
     def get(self, request, *args, **kwargs):
         context = {}

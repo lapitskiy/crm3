@@ -354,7 +354,7 @@ def wb_get_products(headers):
             break  # Выходим из цикла, если total < 100
     return all_item
 
-def wb_get_finance(headers: dict, period: str):
+def wb_get_finance_report(headers: dict, period: str):
     opt_price = ms_get_product()
     opt_price_clear = {}
     for item in opt_price['rows']:
@@ -364,30 +364,7 @@ def wb_get_finance(headers: dict, period: str):
             'opt_price' : int(float(item['buyPrice']['value']) / 100),
             }
 
-    url = "https://statistics-api.wildberries.ru/api/v5/supplier/reportDetailByPeriod"
-    now = datetime.datetime.now()
-    # Вычисляем первый день предыдущего месяца
-    first_day_of_last_month = datetime.datetime(now.year, now.month, 1) - datetime.timedelta(days=1)
-    first_day_of_last_month = first_day_of_last_month.replace(day=1)
-    # Вычисляем последний день предыдущего месяца
-    last_day_of_last_month = first_day_of_last_month.replace(day=1) + datetime.timedelta(days=32)
-    last_day_of_last_month = last_day_of_last_month.replace(day=1) - datetime.timedelta(days=1)
-
-    #date = {
-    #    "dateFrom": first_day_of_last_month.strftime('%Y-%m-%d'),
-    #    "dateTo": last_day_of_last_month.strftime('%Y-%m-%d'),
-    #    "limit": 10000
-    #}
-
-
-    date = {
-        "dateFrom": "2024-11-01",
-        "dateTo": "2024-11-28"
-    }
-
-    print(f'date {date}')
-
-    response = requests.get(url, headers=headers['wb_headers'], params=date).json()
+    response = wb_get_finance_responce(headers=headers['wb_headers'])
 
     count_dicts = len(response)
     print(f"Количество словарей: {count_dicts}")
@@ -586,3 +563,53 @@ def wb_get_finance(headers: dict, period: str):
     result['all_totals'] = all_totals
     result['summed_totals'] = summed_totals
     return result
+
+def wb_get_all_price(headers):
+    opt_price = ms_get_product(headers)
+    if opt_price.get('error') is None:
+        opt_price_clear = {}
+        for item in opt_price['response']['rows']:
+            opt_price_clear[item['article']] = {
+                'opt_price' : int(float(item['buyPrice']['value']) / 100),
+                }
+            
+        response = wb_get_finance_responce(headers=headers['wb_headers'])                   
+        
+    else:
+        result['error'] = opt_price['error']
+        return result
+    
+def wb_get_finance_responce(headers: dict):    
+    url = "https://statistics-api.wildberries.ru/api/v5/supplier/reportDetailByPeriod"
+    now = datetime.datetime.now()
+    # Вычисляем первый день предыдущего месяца
+    first_day_of_last_month = datetime.datetime(now.year, now.month, 1) - datetime.timedelta(days=1)
+    first_day_of_last_month = first_day_of_last_month.replace(day=1)
+    # Вычисляем последний день предыдущего месяца
+    last_day_of_last_month = first_day_of_last_month.replace(day=1) + datetime.timedelta(days=32)
+    last_day_of_last_month = last_day_of_last_month.replace(day=1) - datetime.timedelta(days=1)
+
+    date = {
+        "dateFrom": first_day_of_last_month.strftime('%Y-%m-%d'),
+        "dateTo": last_day_of_last_month.strftime('%Y-%m-%d'),
+        "limit": 10000
+    }
+
+    try:
+        response_raw = requests.get(url, headers=headers['wb_headers'], params=date, timeout=10)
+        try:
+            response = response_raw.json()
+        except Exception as e:
+            logger_error.error(f"Ошибка декодирования JSON: {str(e)}, response: {response_raw.text}")
+            return {
+                "error": f"Ошибка декодирования JSON: {str(e)}",
+                "response": response_raw.text
+            }
+    except requests.exceptions.Timeout:
+        logger_error.warning("Wildberries API timeout")
+        return {"error": "Wildberries API timeout"}
+    except requests.exceptions.RequestException as e:
+        logger_error.warning(f"Wildberries API general request error: {e}")
+        return {"error": f"Wildberries API general request error: {e}"}
+
+    return response

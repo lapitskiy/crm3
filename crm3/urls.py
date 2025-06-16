@@ -24,15 +24,13 @@ from django.contrib.staticfiles.storage import staticfiles_storage
 
 
 urlpatterns = [
-    #owm
-    path('owm/', include('owm.urls')),
-    path('', include('news.urls')),
+    path('', include('owm.urls')),  # Сделать owm главной страницей
+    path('news/', include('news.urls')),
     path('admin/', admin.site.urls),
     path('plugins/', include('plugins.urls')),
     path('users/', include('users.urls')),
     path('select2/', include('django_select2.urls')),
-    #url(r'^select2/', include('django_select2.urls')),
-    ]
+]
 for key, value in settings_plugin.PLUGIN_URLS.items():
     urlpatterns.append(path(value['path'], include(value['include'])))
 #if not settings.DEBUG:

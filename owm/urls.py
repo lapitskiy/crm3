@@ -22,9 +22,11 @@ urlpatterns = [
     path('otpravlenie_ozon/', OtpravlenieOzon.as_view(), name='otpravlenie_ozon'),
     path('price_wb/', PriceWb.as_view(), name='price_wb'),
     path('finance_wb/', FinanceWb.as_view(), name='finance_wb'),
+    path('wb_promo/', WbPromo.as_view(), name='wb_promo'),        
     path('price_yandex/', PriceYandex.as_view(), name='price_yandex'),
     path('enter/', Enter.as_view(), name='enter'),
     path('ajax-request-promo/', ajax_request_promo, name='ajax_request_promo'),
+    
 ]
 
 
