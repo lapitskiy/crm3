@@ -1,18 +1,15 @@
 from django.urls import path
 
 from .views import Enter, Inventory, PriceOzon, PriceWb, PriceYandex, FinanceOzon, PostavkaOzon, FinanceWb, AutoupdateSettings, OtpravlenieOzon, PromotionOzon, SettingsApi, \
-    SettingsContragent, SettingsStorage, SettingsStatus, MSMatchingArticle, SettingsMatchingArticle, ajax_request_promo
+    SettingsContragent, SettingsStorage, SettingsStatus, MSMatchingArticle, SettingsMatchingArticle, WbPromo, ajax_request_promo
 
 urlpatterns = [
     path('', SettingsApi.as_view(), name='settings_api'),
     path('settings_contragent/', SettingsContragent.as_view(), name='settings_contragent'),
     path('settings_storage/', SettingsStorage.as_view(), name='settings_storage'),
     path('settings_status/', SettingsStatus.as_view(), name='settings_status'),
-
     path('ms_matching_article/', MSMatchingArticle.as_view(), name='ms_matching_article'),
     path('settings_matching_article/', SettingsMatchingArticle.as_view(), name='settings_matching_article'),
-
-
     path('inventory/', Inventory.as_view(), name='inventory'),
     path('autoupdatesettings/', AutoupdateSettings.as_view(), name='autoupdate_settings'),
     path('price_ozon/', PriceOzon.as_view(), name='price_ozon'),

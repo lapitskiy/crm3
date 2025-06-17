@@ -16,7 +16,7 @@ from .utils.db_utils import db_update_metadata, db_get_metadata, db_get_settings
 from .utils.ms_utils import ms_update_allstock_to_mp, ms_get_last_enterloss, ms_get_agent_meta, ms_get_organization_meta, ms_get_storage_meta, \
     ms_get_orderstatus_meta, ms_get_product
 from .utils.oz_utils import ozon_get_finance, ozon_get_all_price, ozon_get_postavka, ozon_get_products
-from .utils.wb_utils import wb_get_products, wb_get_finance
+from .utils.wb_utils import wb_get_all_price, wb_get_products
 from .utils.ya_utils import yandex_get_products
 
 from itertools import chain

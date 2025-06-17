@@ -573,7 +573,76 @@ def wb_get_all_price(headers):
                 'opt_price' : int(float(item['buyPrice']['value']) / 100),
                 }
             
-        response = wb_get_finance_responce(headers=headers['wb_headers'])                   
+        response = wb_get_finance_responce(headers=headers) 
+        
+        print(f"responce {response}")
+        exit()
+        
+        realization = {}
+        price_accumulator = {}
+        price_groups = {}
+
+        # Собираем все цены для каждого offer_id
+        for item in response.get('result', {}).get('rows', []):
+            offer_id = item['item'].get('offer_id')
+            quantity = item['delivery_commission']['quantity'] if item.get('delivery_commission') and 'quantity' in item['delivery_commission'] else 0
+            seller_price_per_instance = item.get('seller_price_per_instance')
+            # Суммируем количество продаж
+            if offer_id not in realization or realization[offer_id] is None:
+                realization[offer_id] = {'sale_qty': quantity}
+            else:
+                realization[offer_id]['sale_qty'] = realization[offer_id].get('sale_qty', 0) + quantity
+
+            # Суммируем цену и количество для расчёта средней цены
+            if offer_id not in price_accumulator:
+                price_accumulator[offer_id] = {'total_price': 0, 'count': 0}
+            if seller_price_per_instance is not None:
+                price_accumulator[offer_id]['total_price'] += float(seller_price_per_instance) * quantity
+                price_accumulator[offer_id]['count'] += quantity
+
+            # Собираем все цены (с учетом количества)
+            if offer_id not in price_groups:
+                price_groups[offer_id] = []
+            if seller_price_per_instance is not None:
+                price_groups[offer_id].extend([float(seller_price_per_instance)] * quantity)
+
+        # Вычисляем среднюю цену для каждого offer_id
+        for offer_id, acc in price_accumulator.items():
+            avg_price = acc['total_price'] / acc['count'] if acc['count'] > 0 else 0
+            if offer_id in realization:
+                realization[offer_id]['avg_seller_price'] = int(avg_price)
+            else:
+                realization[offer_id] = {'sale_qty': 0, 'avg_seller_price': int(avg_price)}
+
+        # Убедимся, что у всех offer_id в realization есть avg_seller_price
+        for offer_id in realization:
+            if 'avg_seller_price' not in realization[offer_id]:
+                realization[offer_id]['avg_seller_price'] = 0
+
+        # Группировка цен по диапазону 10% (жадно, без повторов)
+        for offer_id, prices in price_groups.items():
+            if not prices:
+                realization[offer_id]['avg'] = []
+                continue
+            sorted_prices = sorted(prices)
+            used = [False] * len(sorted_prices)
+            groups = []
+            i = 0
+            while i < len(sorted_prices):
+                if used[i]:
+                    i += 1
+                    continue
+                group = [sorted_prices[i]]
+                used[i] = True
+                for j in range(i + 1, len(sorted_prices)):
+                    if not used[j] and abs(sorted_prices[j] - group[0]) / group[0] <= 0.1:
+                        group.append(sorted_prices[j])
+                        used[j] = True
+                groups.append(group)
+                i += 1
+            avg_list = [{len(g): int(sum(g) / len(g))} for g in groups if g]
+            realization[offer_id]['avg'] = avg_list
+                  
         
     else:
         result['error'] = opt_price['error']
@@ -592,9 +661,8 @@ def wb_get_finance_responce(headers: dict):
     date = {
         "dateFrom": first_day_of_last_month.strftime('%Y-%m-%d'),
         "dateTo": last_day_of_last_month.strftime('%Y-%m-%d'),
-        "limit": 10000
+        "limit": 100000
     }
-
     try:
         response_raw = requests.get(url, headers=headers['wb_headers'], params=date, timeout=10)
         try:

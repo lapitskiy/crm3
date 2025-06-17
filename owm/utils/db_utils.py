@@ -155,6 +155,21 @@ def db_update_customerorder(posting_number: str, status: str, seller: Seller):
         print(f"[ERROR] При обновлении заказа: {e}")
         raise
 
+def db_delete_customerorder(posting_number: str, seller: Seller):
+    try:
+        # Пытаемся найти запись с таким posting_number и продавцом
+        awaiting_record = Awaiting.objects.filter(posting_number=posting_number, seller=seller).first()
+
+        if awaiting_record:
+            awaiting_record.delete()
+            print(f"[OK] Удалена запись posting_number={posting_number}")
+        else:
+            print(f"[WARN] Запись с posting_number={posting_number} не найдена. Удаление не выполнено.")
+
+    except Exception as e:
+        print(f"[ERROR] При удалении заказа: {e}")
+        raise
+
 
 def db_get_status(seller: Seller, market: str, exclude_status: str = None) -> Dict[str, Any]:
     """

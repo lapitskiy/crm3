@@ -571,7 +571,7 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
     if ms_update:
         ms_update_allstock_to_mp(headers=headers, seller=seller)
         
-    result.update = wb_fbs_dict.get('error')
+    result['error'] = wb_fbs_dict.get('error')
     return result
 """
 async 

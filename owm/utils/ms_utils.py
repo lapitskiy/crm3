@@ -11,7 +11,7 @@ from django.db import models
 
 import json
 
-from owm.utils.db_utils import db_get_metadata, db_update_customerorder
+from owm.utils.db_utils import db_delete_customerorder, db_get_metadata, db_update_customerorder
 
 import logging
 logger_info = logging.getLogger('crm3_info')
@@ -483,12 +483,17 @@ def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: 
 
     for order in orders:
         i += 1
-        print(f"[обновление {i} из {len_order}]posting number {order['posting_number']}")
-        #print(f"[ms_utils {inspect.currentframe().f_lineno}][ms_create_delivering][{market}] {order['posting_number']} - {ms_orders_dict[order['posting_number']]}")
+        posting_number = order['posting_number']
+        if posting_number not in ms_orders_dict:
+            print(f"[ms_create_sold] Заказ с posting_number '{posting_number}' не найден в ms_orders_dict, пропуск.")
+            db_delete_customerorder(posting_number=posting_number, seller=seller)
+            continue
+        print(f"[обновление {i} из {len_order}]posting number {posting_number}")
+        #print(f"[ms_utils {inspect.currentframe().f_lineno}][ms_create_delivering][{market}] {posting_number} - {ms_orders_dict[posting_number]}")
         order_data = {
             "customerOrder": {
                 "meta": {
-                  "href": f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/{ms_orders_dict[order['posting_number']]}",
+                  "href": f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/{ms_orders_dict[posting_number]}",
                   "metadataHref": "https://api.moysklad.ru/api/remap/1.2/entity/customerorder/metadata",
                   "type": "customerorder",
                   "mediaType": "application/json"
@@ -619,8 +624,12 @@ def ms_create_sold(headers: Dict[str, Any], seller: models.Model, market: str, o
     
     for order in orders:
         i += 1
-        print(f"[обновление {i} из {len_order}]posting number {order['posting_number']}")
-        print(f"[ms_utils {inspect.currentframe().f_lineno}][ms_create_sold][{market}] {order['posting_number']} - {ms_orders_dict[order['posting_number']]}")
+        posting_number = order['posting_number']
+        if posting_number not in ms_orders_dict:
+            print(f"[ms_create_sold] Заказ с posting_number '{posting_number}' не найден в ms_orders_dict, пропуск.")
+            db_delete_customerorder(posting_number=posting_number, seller=seller)
+            continue
+        print(f"[ms_utils {inspect.currentframe().f_lineno}][ms_create_sold][{market}] {posting_number} - {ms_orders_dict[posting_number]}")
         
         url_status = f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/{ms_orders_dict[order['posting_number']]}"
         status_meta = {
@@ -671,6 +680,11 @@ def ms_create_canceled(headers: Dict[str, Any], seller: models.Model, market: st
     metadata = db_get_metadata(seller)
     
     for order in orders:
+        posting_number = order['posting_number']
+        if posting_number not in ms_orders_dict:
+            print(f"[ms_create_sold] Заказ с posting_number '{posting_number}' не найден в ms_orders_dict, пропуск.")
+            db_delete_customerorder(posting_number=posting_number, seller=seller)
+            continue                        
         print(f"[ms_utils {inspect.currentframe().f_lineno}][ms_create_canceled][{market}] {order['posting_number']} - {ms_orders_dict[order['posting_number']]}")
         
         url_status = f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/{ms_orders_dict[order['posting_number']]}"
