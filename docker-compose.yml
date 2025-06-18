@@ -72,7 +72,7 @@ services:
       image: nginx:latest
       container_name: nginx_crm
       ports:
-        - "80:80"
+        - "8080:80"
       volumes:
         - ./nginx/conf.d:/etc/nginx/conf.d:ro
       depends_on:
