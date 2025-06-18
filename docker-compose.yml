@@ -68,6 +68,16 @@ services:
     volumes:
       - .:/app
 
+  nginx:
+      image: nginx:latest
+      container_name: nginx_crm
+      ports:
+        - "80:80"
+      volumes:
+        - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      depends_on:
+        - crm3      
+
   celery_beat:  # Celery Beat
     restart: unless-stopped
     image: crm3:latest
