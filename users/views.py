@@ -7,6 +7,8 @@ from django.views.generic import ListView, TemplateView, DetailView
 from plugins.utils import RelatedMixin
 from django.contrib.auth.models import User
 
+from django.http import HttpResponseRedirect
+
 #from django.views.decorators.csrf import csrf_protect
 #from django.utils.decorators import method_decorator
 #from django.views.decorators.csrf import csrf_exempt
@@ -75,6 +77,7 @@ def user_login(request):
     context = {}
     context['error'] = ''
     superuser = User.objects.filter(is_superuser=True).first()
+    print('TYT')
     if superuser is None:
         context['error'] = 'superuser_is_none'
 
@@ -83,10 +86,11 @@ def user_login(request):
         print(request.COOKIES)
         if form.is_valid():
             user = form.get_user()
-            login(request, user)
-            response.set_cookie('test_cookie', '123')  # проверим, ставятся ли куки
+            login(request, user)            
+            response = HttpResponseRedirect('news_home')  # куда перенаправить после логина
+            response.set_cookie('test_cookie', '123')  # теперь response определён
             print('session key:', request.session.session_key)
-            return redirect('news_home')
+            return response
     else:
         context['form'] = UserLoginForm()
     return render(request, 'users/login.html', context)
