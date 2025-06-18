@@ -80,10 +80,12 @@ def user_login(request):
 
     if request.method == 'POST':
         form = UserLoginForm(data=request.POST)
+        print(request.COOKIES)
         if form.is_valid():
             user = form.get_user()
             login(request, user)
-            print('tyt')
+            response.set_cookie('test_cookie', '123')  # проверим, ставятся ли куки
+            print('session key:', request.session.session_key)
             return redirect('news_home')
     else:
         context['form'] = UserLoginForm()
