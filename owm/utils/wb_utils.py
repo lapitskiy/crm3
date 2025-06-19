@@ -564,7 +564,7 @@ def wb_get_finance_report(headers: dict, period: str):
     result['summed_totals'] = summed_totals
     return result
 
-def wb_get_all_price(headers):
+def wb_get_realized(headers):
     opt_price = ms_get_product(headers)
     if opt_price.get('error') is None:
         opt_price_clear = {}
@@ -573,11 +573,20 @@ def wb_get_all_price(headers):
                 'opt_price' : int(float(item['buyPrice']['value']) / 100),
                 }
             
-        response = wb_get_finance_responce(headers=headers) 
+        response = wb_get_realized_responce(headers=headers) 
+        realization = wb_create_realized_data(response=response, opt_price=opt_price_clear)        
         
+    else:
+        result['error'] = opt_price['error']
+        return result
+
+def wb_create_realized_data(response: dict, opt_price: dict) -> dict:
+
+        # 1 - 
+
+
         print(f"responce {response}")
         exit()
-        
         realization = {}
         price_accumulator = {}
         price_groups = {}
@@ -642,13 +651,9 @@ def wb_get_all_price(headers):
                 i += 1
             avg_list = [{len(g): int(sum(g) / len(g))} for g in groups if g]
             realization[offer_id]['avg'] = avg_list
-                  
-        
-    else:
-        result['error'] = opt_price['error']
-        return result
+                      
     
-def wb_get_finance_responce(headers: dict):    
+def wb_get_realized_responce(headers: dict):    
     url = "https://statistics-api.wildberries.ru/api/v5/supplier/reportDetailByPeriod"
     now = datetime.datetime.now()
     # Вычисляем первый день предыдущего месяца
