@@ -16,7 +16,7 @@ from .utils.db_utils import db_update_metadata, db_get_metadata, db_get_settings
 from .utils.ms_utils import ms_update_allstock_to_mp, ms_get_last_enterloss, ms_get_agent_meta, ms_get_organization_meta, ms_get_storage_meta, \
     ms_get_orderstatus_meta, ms_get_product
 from .utils.oz_utils import ozon_get_finance, ozon_get_all_price, ozon_get_postavka, ozon_get_products
-from .utils.wb_utils import wb_get_all_price, wb_get_products
+from .utils.wb_utils import wb_get_products, wb_get_realized
 from .utils.ya_utils import yandex_get_products
 
 from itertools import chain
@@ -761,8 +761,16 @@ class WbPromo(View):
         context = {}
         
         headers = get_headers(seller)
-        price = wb_get_all_price(headers)
-        context['price'] = price #dict(list(price.items())[:1]) # price
+        
+        ms_product = ms_get_product(headers)
+        
+        # Check for 'error' key in ms_product
+        if 'error' in ms_product:
+            context['error'] = ms_product['error']
+            return render(request, 'owm/promotion_ozon.html', context)
+        
+        realized = wb_get_realized(headers=headers, ms_product=ms_product)
+        context['realized'] = realized #dict(list(price.items())[:1]) # price
         return render(request, 'owm/promotion_ozon.html', context)
 
     def post(self, request, *args, **kwargs):

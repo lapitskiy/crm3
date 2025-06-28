@@ -30,6 +30,12 @@ def ms_get_product(headers):
         if response.status_code == 200:
             result['status_code'] = response.status_code
             result['response'] = response.json()
+            opt_price_clear = {}                                    
+            for item in result['response']['rows']:
+                opt_price_clear[item['article']] = {
+                    'opt_price' : int(float(item['buyPrice']['value']) / 100),
+                    }   
+            result['opt_price'] = opt_price_clear
         else:
             result['status_code'] = response.status_code
             result['error'] = '[ms_get_product] ' + response.text
@@ -37,7 +43,7 @@ def ms_get_product(headers):
     except requests.exceptions.ConnectionError as e:
         result['status_code'] = None
         result['error'] = f"[ms_get_product] Connection error: {e}"
-        logger_error.error(f"Connection error in ms_get_product: {e}")
+        logger_error.error(f"Connection error in ms_get_product: {e}")        
     return result
 
 def ms_get_organization_meta(headers) -> list:

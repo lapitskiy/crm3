@@ -6,6 +6,7 @@ import datetime
 from owm.models import Seller
 from owm.utils.db_utils import db_check_awaiting_postingnumber, db_get_status
 from owm.utils.ms_utils import ms_get_product
+import json
 
 logger_info = logging.getLogger('crm3_info')
 logger_error = logging.getLogger('crm3_error')
@@ -564,36 +565,208 @@ def wb_get_finance_report(headers: dict, period: str):
     result['summed_totals'] = summed_totals
     return result
 
-def wb_get_realized(headers):
-    opt_price = ms_get_product(headers)
-    if opt_price.get('error') is None:
-        opt_price_clear = {}
-        for item in opt_price['response']['rows']:
-            opt_price_clear[item['article']] = {
-                'opt_price' : int(float(item['buyPrice']['value']) / 100),
-                }
-            
-        response = wb_get_realized_responce(headers=headers) 
-        realization = wb_create_realized_data(response=response, opt_price=opt_price_clear)        
-        
-    else:
-        result['error'] = opt_price['error']
-        return result
-
-def wb_create_realized_data(response: dict, opt_price: dict) -> dict:
-
-        # 1 - 
+def wb_get_realized(headers: dict, ms_product: dict) -> dict:
+    response = wb_get_realized_responce(headers=headers)
+    
+    realization = wb_create_realized_data(response=response, opt_price=ms_product['opt_price'])
+    return realization
 
 
-        print(f"responce {response}")
-        exit()
+# 1 - data["sale"] - содержит вы выплаты wb
+# 2 - 
+def wb_create_realized_data(response: list, opt_price: dict) -> dict:
+
+        #print(f"responce {response}")
+
         realization = {}
         price_accumulator = {}
         price_groups = {}
 
-        # Собираем все цены для каждого offer_id
+        # Собираем все реализации в одну продажу, чтобы понять стоимость продажи, чистую итд
+        srid_map = {}
+
+        # Support both dict and list response types
+
+        for item in response:
+            srid = item.get('srid')
+            if not srid:
+                continue
+            offerid = item.get('sa_name')
+            supplier_oper_name = item.get('supplier_oper_name')
+
+            if srid not in srid_map:
+                srid_map[srid] = {
+                    "offerid": None,
+                    "sale_raw": None,
+                    "delivery": 0,
+                    "reimbursement": 0,
+                    "storage": 0,
+                    "acceptance": 0,
+                    "return": 0,
+                    "for_pay": 0
+                }
+            # Устанавливаем offerid только если он не пустой и еще не установлен
+            if offerid and srid_map[srid]["offerid"] is None:
+                srid_map[srid]["offerid"] = offerid
+
+            # Продажа
+            if supplier_oper_name == "Продажа":
+                srid_map[srid]["sale_raw"] = item                
+
+            # Логистика
+            elif supplier_oper_name == "Логистика":
+                srid_map[srid]["delivery"] += float(item.get("delivery_rub", 0) or 0)
+
+            # Возмещение издержек по перевозке/по складским операциям с товаром
+            elif supplier_oper_name == "Возмещение издержек по перевозке/по складским операциям с товаром":
+                srid_map[srid]["reimbursement"] += float(item.get("rebill_logistic_cost", 0) or 0)
+
+            # Хранение
+            elif supplier_oper_name == "Хранение":
+                srid_map[srid]["storage"] += float(item.get("storage_fee", 0) or 0)
+
+            # Платная приемка
+            elif supplier_oper_name == "Платная приемка":
+                srid_map[srid]["acceptance"] += float(item.get("acceptance", 0) or 0)
+
+            # Возмещение за выдачу и возврат товаров на ПВЗ
+            elif supplier_oper_name == "Возмещение за выдачу и возврат товаров на ПВЗ":
+                srid_map[srid]["return"] += float(item.get("ppvz_reward", 0) or 0)
+
+            # После сбора всех данных, вычисляем for_pay если есть продажа
+            # ВАЖНО: вычислять for_pay нужно только после обработки всех строк (после основного цикла for)
+            # Поэтому здесь вычислять НЕ нужно, а только после цикла пройтись по srid_map и вычислить for_pay для тех, где есть sale
+
+        # После основного цикла: вычисляем for_pay для всех srid, где есть sale
+        for srid, data in srid_map.items():
+            if data["sale_raw"]:
+                sale_item = data["sale_raw"]
+                ppvz_for_pay = float(sale_item.get("ppvz_for_pay", 0) or 0)
+                delivery = data["delivery"]
+                reimbursement = data["reimbursement"]
+                storage = data["storage"]
+                acceptance = data["acceptance"]
+                return_val = data["return"]
+                data["for_pay"] = (
+                    ppvz_for_pay - delivery - reimbursement - storage - acceptance - return_val
+                )
+
+        # Подсчет элементов с offerid == None и sale_raw == None
+        # Создаем словарь для srid с offerid == None и sale_raw == None
+        srid_unknow = {
+            "unknow_data": {},
+            "all_count": {}
+        }
+        srid_to_remove = []
+        for srid, data in srid_map.items():
+            if data["offerid"] is None and data["sale_raw"] is None:
+                srid_unknow["unknow_data"][srid] = data
+            # Суммируем все значения по ключам
+                for key, value in data.items():
+                    if isinstance(value, (int, float)):
+                        srid_unknow["all_count"][key] = srid_unknow["all_count"].get(key, 0) + value
+                srid_to_remove.append(srid)
+        # Удаляем такие srid из srid_map
+        for srid in srid_to_remove:
+            srid_map.pop(srid, None)
+
+
+        # Выведем первые 2 элементов srid_map как json
+        #print(json.dumps(dict(list(srid_map.items())[:2]), ensure_ascii=False, indent=2))
+        
+        # commission_percent Размер кВВ, %
+        # ppvz_reward Возмещение за выдачу и возврат товаров на ПВЗ
+        # acquiring_percent Размер комиссии за эквайринг/Комиссии за организацию платежей, %
+        # Склад поставщика in office_name
+        
+        # Группируем продажи по offerid
+        # Группируем продажи по offerid и по типу склада (mystore/wbstore)
+        offerid_sales = {}
+        for srid, data in srid_map.items():
+            offerid = data.get("offerid")
+            if not offerid:
+                continue
+            office_name = data["sale_raw"].get("office_name") if data.get("sale_raw") else ""
+            store_type = "mystore" if "Склад поставщика" in (office_name or "") else "wbstore"
+
+            if offerid not in offerid_sales:
+                offerid_sales[offerid] = {
+                    "mystore": {
+                    "delivery": [],
+                    "reimbursement": [],
+                    "storage": [],
+                    "acceptance": [],
+                    "return": [],
+                    "commission_percent": [],
+                    "sales": [],
+                    "sale_qty": 0  # счетчик количества продаж
+                    },
+                    "wbstore": {
+                    "delivery": [],
+                    "reimbursement": [],
+                    "storage": [],
+                    "acceptance": [],
+                    "return": [],
+                    "commission_percent": [],
+                    "sales": [],
+                    "sale_qty": 0  # счетчик количества продаж
+                    },
+                }
+
+            store = offerid_sales[offerid][store_type]
+            # Добавляем саму продажу (товар) в список sales
+            if data.get("sale_raw"):
+                store["sales"].append({
+                    **data["sale_raw"],
+                    "details": {
+                    "delivery": data.get("delivery", 0),
+                    "reimbursement": data.get("reimbursement", 0),
+                    "storage": data.get("storage", 0),
+                    "acceptance": data.get("acceptance", 0),
+                    "return": data.get("return", 0),
+                    "for_pay": data.get("for_pay", 0),
+                    }
+                })
+            # Увеличиваем счетчик количества продаж
+            try:
+                qty = int(data["sale_raw"].get("quantity", 1))
+            except Exception:
+                qty = 1
+            store["sale_qty"] += qty
+
+            for key in ("delivery", "reimbursement", "storage", "acceptance", "return"):
+                store[key].append(data.get(key, 0) or 0)
+                if data.get("sale_raw"):
+                    commission_percent = data["sale_raw"].get("commission_percent")
+                    if commission_percent is not None:
+                        try:
+                            store["commission_percent"].append(float(commission_percent))
+                        except Exception:
+                            pass
+                        
+        # Усредняем значения по каждому offerid и типу склада, округляя до двух знаков после запятой
+        for offerid in offerid_sales:
+            for store_type in ("mystore", "wbstore"):
+                store = offerid_sales[offerid][store_type]
+                for key in ("delivery", "reimbursement", "storage", "acceptance", "return", "commission_percent"):
+                    values = store[key]
+                    store[key] = round(sum(values) / len(values), 2) if values else 0
+            # sales оставляем списком товаров
+
+        # Теперь offerid_sales = {'offerid1': {srid1: {...}, srid2: {...}}, 'offerid2': {...}, ...}
+        # Если нужно значения в list:
+        # offerid_sales_list = {offerid: list(sales.values()) for offerid, sales in offerid_sales.items()}
+        
+
+
+        
+        print(json.dumps(dict(list(offerid_sales.items())[:3]), ensure_ascii=False, indent=2))
+        exit()
+        
+        
+        # тут 
         for item in response.get('result', {}).get('rows', []):
-            offer_id = item['item'].get('offer_id')
+            offer_id = item['item'].get('sa_name')
             quantity = item['delivery_commission']['quantity'] if item.get('delivery_commission') and 'quantity' in item['delivery_commission'] else 0
             seller_price_per_instance = item.get('seller_price_per_instance')
             # Суммируем количество продаж
@@ -653,6 +826,7 @@ def wb_create_realized_data(response: dict, opt_price: dict) -> dict:
             realization[offer_id]['avg'] = avg_list
                       
     
+# https://dev.wildberries.ru/openapi/financial-reports-and-accounting#tag/Finansovye-otchyoty/paths/~1api~1v5~1supplier~1reportDetailByPeriod/get    
 def wb_get_realized_responce(headers: dict):    
     url = "https://statistics-api.wildberries.ru/api/v5/supplier/reportDetailByPeriod"
     now = datetime.datetime.now()
