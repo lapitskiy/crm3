@@ -12,10 +12,10 @@ from django.http import HttpResponse
 
 from datetime import datetime
 
-from .utils.db_utils import db_update_metadata, db_get_metadata, db_get_settings, db_update_settings
+from .utils.db_utils import db_get_promo_products, db_update_metadata, db_get_metadata, db_get_settings, db_update_settings
 from .utils.ms_utils import ms_update_allstock_to_mp, ms_get_last_enterloss, ms_get_agent_meta, ms_get_organization_meta, ms_get_storage_meta, \
     ms_get_orderstatus_meta, ms_get_product
-from .utils.oz_utils import ozon_get_finance, ozon_get_all_price, ozon_get_postavka, ozon_get_products
+from .utils.oz_utils import ozon_get_finance, ozon_get_all_price, ozon_get_postavka, ozon_get_products, ozon_update_promo
 from .utils.wb_utils import wb_get_products, wb_get_realized
 from .utils.ya_utils import yandex_get_products
 
@@ -737,6 +737,8 @@ class PromotionOzon(View):
         context = {}
         
         headers = get_headers(seller)
+        db_promo_data = db_get_promo_products(seller=seller)        
+        context['db_data'] = db_promo_data                    
         price = ozon_get_all_price(headers)
         context['price'] = price #dict(list(price.items())[:1]) # price
         return render(request, 'owm/promotion_ozon.html', context)
@@ -823,16 +825,15 @@ class FinanceOzon(View):
             return redirect('login')  # или другая страница        
         
         user_company = request.user.userprofile.company
-        parser = Seller.objects.filter(company=user_company).first()
-        headers = get_headers(parser)
+        seller = Seller.objects.filter(company=user_company).first()
+        
+        headers = get_headers(seller)
         data = ozon_get_finance(headers, period='month')
         if 'error' not in data:
             context['report'] = data['sorted_report']  # dict(list(price.items())[:1]) # price
             context['summed_totals'] = data['summed_totals']  # dict(list(price.items())[:1]) # price
             context['all_totals'] = data['all_totals']
             context['header_data'] = data['header_data']
-
-            #print(f"headers {context['headers']}")
             #print(f"$$$$$$$$$$$$$$$$$")
             #print(f"$$$$$$$$$$$$$$$$$")
             #print(f"$$$$$$$$$$$$$$$$$")
@@ -1032,18 +1033,19 @@ def ajax_request_promo(request):
                 'min_price_limit_count': data.get('min_price_limit_count'),
                 'min_price_promo': data.get('min_price_promo'),
                 'limit_count_value': data.get('limit_count_value'),
-                'disable_fbs': data.get('disable_fbs'),
-                'disable_limit_count': data.get('disable_limit_count'),
-                'disable_promo': data.get('disable_promo'),                                
+                'use_fbs': data.get('use_fbs'),
+                'use_limit_count': data.get('use_limit_count'),
+                'use_promo': data.get('use_promo'),       
+                'market': data.get('market')
             }
-            print(f"offer_id: {offer_id}")
-            print(f"promo_data: {promo_data}")
+            #print(f"promo_data: {promo_data}")
             # Здесь логика обновления цены, например:
-            if market == 'ozon':
-                result = ozon_update_promo(promo_data, seller=seller, headers=headers)                
+            if market == 'ozon':                
+                result = ozon_update_promo(promo_data=promo_data, seller=seller, headers=headers)                
             # Если все прошло успешно:
             return JsonResponse({'success': True})
         except Exception as e:
+            print(f"data: {data}")
             return JsonResponse({'success': False, 'error': str(e)})
     else:
         return JsonResponse({'success': False, 'error': 'Invalid request method'})

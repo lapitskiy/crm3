@@ -72,9 +72,9 @@ class PromoProduct(models.Model):
     min_price_limit_count = models.IntegerField(null=True, blank=True, verbose_name='Мин. цена для лимита')
     min_price_promo = models.IntegerField(null=True, blank=True, verbose_name='Мин. цена для акции')
     limit_count_value = models.IntegerField(null=True, blank=True, verbose_name='Значение лимита')
-    disable_fbs = models.BooleanField(default=False, verbose_name='Отключить FBS')
-    disable_limit_count = models.BooleanField(default=False, verbose_name='Отключить лимит')
-    disable_promo = models.BooleanField(default=False, verbose_name='Отключить участие в акции')
+    use_fbs = models.BooleanField(default=False, verbose_name='Отключить FBS')
+    use_limit_count = models.BooleanField(default=False, verbose_name='Отключить лимит')
+    use_promo = models.BooleanField(default=False, verbose_name='Отключить участие в акции')
 
     class Meta:
         unique_together = ('promo_market', 'offer_id')

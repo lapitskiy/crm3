@@ -35,6 +35,9 @@ function input() {
 }
 </script>
 
+
+DATA: {{ db_data }} !!!!
+
     <h1>Акции OZON</h1>
 <input type="text" id="search" onkeyup="input()">
 <p id="block"></p>
@@ -154,20 +157,24 @@ function input() {
             <a href="https://seller.ozon.ru/app/prices/manager/{{ value.product_id }}/prices">Посмотреть цену товара в личном кабинете ozon</a>
             <br><br>
             <div class="d-flex align-items-start mb-2">
-                <input type="checkbox" id="disable_fbs_{{ offer_id }}" name="disable_fbs_{{ offer_id }}" class="me-2 mt-1">
-                <label for="disable_fbs_{{ offer_id }}" class="form-check-label" style="margin-bottom:0;">
+
+                <input type="checkbox" id="use_fbs_{{ offer_id }}" name="use_fbs_{{ offer_id }}" class="me-2 mt-1"
+                    {% if db_data|get_item:offer_id and db_data|get_item:offer_id|get_item:'use_fbs' %}checked{% endif %}>
+
+                <label for="use_fbs_{{ offer_id }}" class="form-check-label" style="margin-bottom:0;">
                     <div>
                     <strong>Минимальная цена от текущей, при которой товар перестает продаваться на FBS</strong>
                     <br>
                     <span style="font-size: 90%;">
                         (выставляется остатки в 0 на FBS)<br>
+                        - <b>{{ value.min_price|default_if_none:'' }}</b> Текущая минимальная цена указанная в кабинете Озон
                         - <i>используется если товар FBO продавать выгодно, но отгружать FBS не выгодно, а цену не поменять, тогда проще убрать остатки FBS если они по текущей акции не приносят прибыли.</i><br>
                         - <i>функция активируется, если у товара есть остатки на FBO</i>
                     </span>
                     </div>
                 </label>
             </div>
-            <input type="text" class="form-control" name="{{ offer_id }}_min_price_fbs" id="min_price_fbs_{{ offer_id }}" aria-describedby="basic-addon3" value="{{ value.min_price }}" style="width: 150px;" oninput="updateFBSProfitFromInput('{{ offer_id }}')"
+            <input type="text" class="form-control" name="{{ offer_id }}_min_price_fbs" id="min_price_fbs_{{ offer_id }}" aria-describedby="basic-addon3" value="{% if db_data|get_item:offer_id and db_data|get_item:offer_id|get_item:'min_price_fbs' %}{{ db_data|get_item:offer_id|get_item:'min_price_fbs' }}{% else %}{{ value.min_price }}{% endif %}" style="width: 150px;" oninput="updateFBSProfitFromInput('{{ offer_id }}')"
             data-opt-price="{{ value.opt_price }}"
             data-acquiring="{{ value.acquiring }}"
             data-sales-percent-fbs="{{ value.sales_percent_fbs }}"
@@ -197,8 +204,9 @@ function input() {
             <input type="hidden" id="{{ offer_id }}_limit_count" name="{{ offer_id }}_limit_count" value="{{ offer_id }}" />            
             <br>
             <div class="d-flex align-items-start mb-2">
-                <input type="checkbox" id="disable_limit_count_{{ offer_id }}" name="disable_limit_count_{{ offer_id }}" class="me-2 mt-1">
-                <label for="disable_limit_count_{{ offer_id }}" class="form-check-label" style="margin-bottom:0;">
+                <input type="checkbox" id="use_limit_count_{{ offer_id }}" name="use_limit_count_{{ offer_id }}" class="me-2 mt-1"
+                    {% if db_data|get_item:offer_id and db_data|get_item:offer_id|get_item:'use_limit_count' %}checked{% endif %}>
+                <label for="use_limit_count_{{ offer_id }}" class="form-check-label" style="margin-bottom:0;">
                     <div>
                     <strong>Если остаток меньше указанного</strong>                
                     <br>
@@ -209,12 +217,19 @@ function input() {
                 </label>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <input type="number" class="form-control" name="{{ offer_id }}_limit_count_value" id="limit_count_value_{{ offer_id }}" value="{{ value.limit_count|default_if_none:1 }}" min="1" style="width: 100px;" placeholder="Кол-во">
-                <input type="text" class="form-control" name="{{ offer_id }}_min_price_limit_count" id="min_price_limit_count_{{ offer_id }}" aria-describedby="basic-addon3" value="{{ value.min_price }}" style="width: 150px;" 
-                oninput="updateLimitCountProfitFromInput('{{ offer_id }}')" 
-                data-opt-price="{{ value.opt_price }}" data-acquiring="{{ value.acquiring }}" 
-                data-sales-percent-fbs="{{ value.sales_percent_fbs }}" data-fbs-deliv-to-customer-amount="{{ value.fbs_deliv_to_customer_amount }}" 
-                data-fbs-direct-flow-trans="{{ value.fbs_direct_flow_trans }}" data-fbs-first-mile-avg="{{ value.fbs_first_mile_avg }}">
+                <input type="number" class="form-control" name="{{ offer_id }}_limit_count_value" id="limit_count_value_{{ offer_id }}" 
+                    value="{% if db_data|get_item:offer_id and db_data|get_item:offer_id|get_item:'limit_count_value' %}{{ db_data|get_item:offer_id|get_item:'limit_count_value' }}{% else %}{{ value.limit_count|default_if_none:1 }}{% endif %}" 
+                    min="1" style="width: 100px;" placeholder="Кол-во">
+                <input type="text" class="form-control" name="{{ offer_id }}_min_price_limit_count" id="min_price_limit_count_{{ offer_id }}" aria-describedby="basic-addon3" 
+                    value="{% if db_data|get_item:offer_id and db_data|get_item:offer_id|get_item:'min_price_limit_count' %}{{ db_data|get_item:offer_id|get_item:'min_price_limit_count' }}{% else %}{{ value.min_price }}{% endif %}" 
+                    style="width: 150px;" 
+                    oninput="updateLimitCountProfitFromInput('{{ offer_id }}')" 
+                    data-opt-price="{{ value.opt_price }}" 
+                    data-acquiring="{{ value.acquiring }}" 
+                    data-sales-percent-fbs="{{ value.sales_percent_fbs }}" 
+                    data-fbs-deliv-to-customer-amount="{{ value.fbs_deliv_to_customer_amount }}" 
+                    data-fbs-direct-flow-trans="{{ value.fbs_direct_flow_trans }}" 
+                    data-fbs-first-mile-avg="{{ value.fbs_first_mile_avg }}">
             </div>
             <div class="d-flex align-items-center" style="margin-top: 10px;">
                 <span class="ms-4">
@@ -237,8 +252,9 @@ function input() {
             <td colspan="6">
             <input type="hidden" id="{{ offer_id }}_promo" name="{{ offer_id }}_promo" value="offer_id" />
             <div class="d-flex align-items-start mb-2">
-                <input type="checkbox" id="disable_promo_{{ offer_id }}" name="disable_promo_{{ offer_id }}" class="me-2 mt-1">
-                <label for="disable_promo_{{ offer_id }}" class="form-check-label" style="margin-bottom:0;">
+                <input type="checkbox" id="use_promo_{{ offer_id }}" name="use_promo_{{ offer_id }}" class="me-2 mt-1"
+                    {% if db_data|get_item:offer_id and db_data|get_item:offer_id|get_item:'use_promo' %}checked{% endif %}>
+                <label for="use_promo_{{ offer_id }}" class="form-check-label" style="margin-bottom:0;">
                 <div>
                     <strong>Отключить участие товара в акции, которая ниже указанной цены (в остальных акциях товар продолжит участвовать)</strong>
                     <br>
@@ -250,7 +266,10 @@ function input() {
                 </div>
                 </label>
             </div>
-            <input type="text" class="form-control" name="{{ offer_id }}_min_price_promo" id="min_price_promo_{{ offer_id }}" aria-describedby="basic-addon3" value="{{ value.min_price }}" style="width: 150px;" oninput="updatePromoProfitFromInput('{{ offer_id }}')"
+            <input type="text" class="form-control" name="{{ offer_id }}_min_price_promo" id="min_price_promo_{{ offer_id }}" aria-describedby="basic-addon3" 
+                value="{% if db_data|get_item:offer_id and db_data|get_item:offer_id|get_item:'min_price_promo' %}{{ db_data|get_item:offer_id|get_item:'min_price_promo' }}{% else %}{{ value.min_price }}{% endif %}" 
+                style="width: 150px;" 
+                oninput="updatePromoProfitFromInput('{{ offer_id }}')"
                 data-opt-price="{{ value.opt_price }}"
                 data-acquiring="{{ value.acquiring }}"
                 data-sales-percent-fbs="{{ value.sales_percent_fbs }}"
@@ -276,12 +295,6 @@ function input() {
             </div>
             <hr>
             <div class="mt-2" id="fbs_debug_promo_{{ offer_id }}" style="font-size: 12px; color: #888;"></div>
-            <br>
-            <!-- Кнопка обновления для всех полей и чекбоксов -->
-            <button type="button" class="btn btn-success d-inline-flex align-items-center ms-3" id="update_all_btn_{{ offer_id }}" onclick="updateAllFieldsAjax('{{ offer_id }}')">
-                <span class="spinner-border spinner-border-sm me-2 d-none" id="spinner_all_{{ offer_id }}" role="status" aria-hidden="true"></span>
-                Обновить параметры {{ offer_id }}
-            </button>
             </td>
         </tr>
         <script>
@@ -298,9 +311,9 @@ function input() {
                 min_price_limit_count: document.getElementById('min_price_limit_count_' + offerId)?.value || '',
                 min_price_promo: document.getElementById('min_price_promo_' + offerId)?.value || '',
                 limit_count_value: document.getElementById('limit_count_value_' + offerId)?.value || '',
-                disable_fbs: document.getElementById('disable_fbs_' + offerId)?.checked || false,
-                disable_limit_count: document.getElementById('disable_limit_count_' + offerId)?.checked || false,
-                disable_promo: document.getElementById('disable_promo_' + offerId)?.checked || false,
+                use_fbs: document.getElementById('use_fbs_' + offerId)?.checked || false,
+                use_limit_count: document.getElementById('use_limit_count_' + offerId)?.checked || false,
+                use_promo: document.getElementById('use_promo_' + offerId)?.checked || false,
                 market: "ozon"
             };
 
@@ -429,7 +442,38 @@ function input() {
         </script>
 
 
-
+1111111111111
+        {% with row_class=value.profit_percent_fbs|sale_qty_get_row_class %}
+        <tr id="{{ offer_id }}_discount" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.1 }};">
+        {% endwith %} 
+            <td colspan="6">
+            <input type="hidden" id="{{ offer_id }}_discount" name="{{ offer_id }}_discount" value="offer_id" />
+            <div class="d-flex align-items-start mb-2">
+                <input type="checkbox" id="use_discount_{{ offer_id }}" name="use_discount_{{ offer_id }}" class="me-2 mt-1"
+                    {% if db_data|get_item:offer_id and db_data|get_item:offer_id|get_item:'use_promo' %}checked{% endif %}>
+                <label for="use_discount_{{ offer_id }}" class="form-check-label" style="margin-bottom:0;">
+                <div>
+                    <strong>Автоматическое принятие скидки</strong>
+                    <br>
+                    <span style="font-size: 90%;">
+                    <i>Используйте, если хотите чтобы скидки принимались с минимальным процентом</i>
+                    <i>Если минимальная скидка (3%) больше указаной цены, тогда скидка отменяется, если цена входит, то выставляется 3% и одобряется</i>                    
+                    </span>
+                </div>
+                </label>
+            </div>
+            <input type="text" class="form-control" name="{{ offer_id }}_min_price_discount" id="min_price_discount_{{ offer_id }}" aria-describedby="basic-addon3" 
+                value="{% if db_data|get_item:offer_id and db_data|get_item:offer_id|get_item:'min_price_discount' %}{{ db_data|get_item:offer_id|get_item:'min_price_discount' }}{% else %}{{ value.min_price }}{% endif %}" 
+                style="width: 150px;"/>
+            
+            <hr>
+            <!-- Кнопка обновления для всех полей и чекбоксов -->
+            <button type="button" class="btn btn-success d-inline-flex align-items-center ms-3" id="update_all_btn_{{ offer_id }}" onclick="updateAllFieldsAjax('{{ offer_id }}')">
+                <span class="spinner-border spinner-border-sm me-2 d-none" id="spinner_all_{{ offer_id }}" role="status" aria-hidden="true"></span>
+                Обновить параметры {{ offer_id }}
+            </button>
+            </td>
+        </tr>
 
 
         <tr>

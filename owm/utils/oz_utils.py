@@ -7,7 +7,7 @@ import sys
 from dateutil.relativedelta import relativedelta
 
 from owm.models import Seller
-from owm.utils.db_utils import db_check_awaiting_postingnumber, db_get_status
+from owm.utils.db_utils import db_check_awaiting_postingnumber, db_get_status, db_update_promo_products
 from owm.utils.ms_utils import ms_get_product
 
 import locale
@@ -982,9 +982,10 @@ def ozon_update_promo(promo_data, seller, headers):
     url = "https://api-seller.ozon.ru/v1/product/import/prices"                
     
     try:
+        if not db_update_promo_products(seller=seller, promo_data=promo_data): return JsonResponse({'success': False, 'error': 'db update promo error'})
         response_raw = requests.post(url, headers=headers['ozon_headers'], json=promo_data, timeout=10)
-        try:
-            response = response_raw.json()
+        try:            
+            response = response_raw.json()            
             return JsonResponse({'success': True, 'response': response})
         
         except Exception as e:

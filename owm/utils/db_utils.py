@@ -4,6 +4,7 @@ from owm.models import Awaiting, Awaiting_product, Metadata, Settings, Seller
 from typing import Any, Dict
 
 import redis
+from owm.models import PromoMarket, PromoProduct
 
 redis_client = redis.Redis(
     host='redis',     # имя сервиса в docker-compose
@@ -210,3 +211,82 @@ def db_update_settings(seller, type, settings_dict):
     if settings:
         settings.settings_dict = settings_dict
         settings.save()
+        
+def db_update_promo_products(seller, promo_data: dict) -> bool:
+    """
+    Обновляет настройки акций товара для продавца.
+    promo_data: {
+        "market": str,
+        "offer_id": str,
+        "yourprice": int,
+        "minprice": int,
+        "min_price_fbs": int,
+        "min_price_limit_count": int,
+        "min_price_promo": int,
+        "limit_count_value": int,
+        "disable_fbs": bool,
+        "disable_limit_count": bool,
+        "disable_promo": bool
+    }
+    """
+
+    try:
+        print(f"promo_data {promo_data}")
+        market = promo_data.get("market")
+        offer_id = promo_data.get("offer_id")
+
+        if not market or not offer_id:
+            return False
+
+        promo_market, _ = PromoMarket.objects.get_or_create(seller=seller, market=market)
+
+        promo_product, _ = PromoProduct.objects.get_or_create(
+            promo_market=promo_market,
+            offer_id=offer_id
+        )
+
+        # Обновляем все поля, если они есть в словаре
+        
+        for field in [
+            "yourprice", "minprice", "min_price_fbs", "min_price_limit_count",
+            "min_price_promo", "limit_count_value", "use_fbs",
+            "use_limit_count", "use_promo"
+        ]:
+            if field in promo_data:
+                value = promo_data[field]
+                if field == "limit_count_value":
+                    # Если значение пустое или None, выставляем 1
+                    if value in ("", None):
+                        value = 1
+                setattr(promo_product, field, value)
+
+        promo_product.save()
+        return True
+    except Exception as e:
+        print(f"[ERROR] db_update_promo_products: {e}")
+        return False
+
+def db_get_promo_products(seller) -> dict:
+    """
+    Получает все настройки акций товаров для текущего продавца.
+    Возвращает dict promo_data с offer_id в качестве ключа.
+    """
+    result = {}
+    promo_markets = PromoMarket.objects.filter(seller=seller)
+    for promo_market in promo_markets:
+        promo_products = PromoProduct.objects.filter(promo_market=promo_market)
+        for product in promo_products:
+            result[product.offer_id] = {
+                "market": promo_market.market,
+                "offer_id": product.offer_id,
+                "yourprice": product.yourprice,
+                "minprice": product.minprice,
+                "min_price_fbs": product.min_price_fbs,
+                "min_price_limit_count": product.min_price_limit_count,
+                "min_price_promo": product.min_price_promo,
+                "limit_count_value": product.limit_count_value,
+                "use_fbs": product.use_fbs,
+                "use_limit_count": product.use_limit_count,
+                "use_promo": product.use_promo,
+            }
+    return result
