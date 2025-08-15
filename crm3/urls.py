@@ -24,8 +24,8 @@ from django.contrib.staticfiles.storage import staticfiles_storage
 
 
 urlpatterns = [
-    path('', include('owm.urls')),  # Сделать owm главной страницей
-    path('news/', include('news.urls')),
+    path('', include('news.urls')),  # Сделать новости главной страницей
+    path('owm/', include('owm.urls')),  # Перенести owm на /owm/
     path('admin/', admin.site.urls),
     path('plugins/', include('plugins.urls')),
     path('users/', include('users.urls')),
