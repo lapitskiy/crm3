@@ -75,6 +75,7 @@ class PromoProduct(models.Model):
     use_fbs = models.BooleanField(default=False, verbose_name='Отключить FBS')
     use_limit_count = models.BooleanField(default=False, verbose_name='Отключить лимит')
     use_promo = models.BooleanField(default=False, verbose_name='Отключить участие в акции')
+    autoupdate_promo = models.BooleanField(default=False, verbose_name='Автообновление дней акции')
 
     class Meta:
         unique_together = ('promo_market', 'offer_id')

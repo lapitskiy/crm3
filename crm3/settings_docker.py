@@ -23,12 +23,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/3.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = environ.get('b=6b6nm*el46o2-2e^y*f0d!adb@yatl9@x)x&n#d0nav#j45n')
+SECRET_KEY = environ.get('SECRET_KEY', 'b=6b6nm*el46o2-2e^y*f0d!adb@yatl9@x)x&n#d0nav#j45n')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = int(environ.get('DEBUG', default=0))
 
-ALLOWED_HOSTS = environ.get('*').split(' ')
+ALLOWED_HOSTS = environ.get('ALLOWED_HOSTS', '*').split(' ')
 
 
 # Application definition
@@ -87,14 +87,12 @@ WSGI_APPLICATION = 'crm3.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'crm3_',
-        #'NAME': 'crm3_test',
-        'USER': 'root',
-        'PASSWORD': 'root',
-        'HOST': 'localhost',
-        #'ENGINE': 'django.db.backends.sqlite3',
-        #'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': environ.get('DATABASE_NAME', 'postgres'),
+        'USER': environ.get('DATABASE_USER', 'crm3'),
+        'PASSWORD': environ.get('DATABASE_PASSWORD', 'Billkill13'),
+        'HOST': environ.get('DATABASE_HOST', 'postgres'),
+        'PORT': environ.get('DATABASE_PORT', '5432'),
     }
 }
 
@@ -207,3 +205,17 @@ LOGGING = {
         },
     },
 }
+
+# Redis settings
+REDIS_HOST = environ.get('REDIS_HOST', 'redis')
+REDIS_PORT = environ.get('REDIS_PORT', '6379')
+REDIS_PASSWORD = environ.get('REDIS_PASSWORD', 'Billkill13')
+REDIS_DB = environ.get('REDIS_DB', '0')
+
+# Celery settings
+CELERY_BROKER_URL = environ.get('CELERY_BROKER_URL', f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}')
+CELERY_RESULT_BACKEND = environ.get('CELERY_RESULT_BACKEND', f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/1')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE

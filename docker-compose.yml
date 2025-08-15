@@ -38,7 +38,7 @@ services:
       - DATABASE_PASSWORD=Billkill13
       - DATABASE_HOST=postgres
     ports:
-      - "8001:8000"  # Предполагается, что ваше приложение работает на 8000 порту
+      - "8888:8000"  # Предполагается, что ваше приложение работает на 8000 порту
     volumes:
       - .:/app
     depends_on:

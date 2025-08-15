@@ -500,7 +500,7 @@ def ozon_get_finance(headers: dict, period: str):
         total_payoff += int(payoff)
 
         # total_payoff это сумма всех движенией за месяц, включая выплаты или возвраты за предыдыщуие заказаы и или месяцы
-        # all_payoff это сумма именно заказов внутри месяца, она может быть выше, поскольу не учитывает вычиты с других заказаов, которые не привязаны
+        # all_payoff это сумма именно заказов внутри месяца, она может быть выше, поскольку не учитывает вычиты с других заказаов, которые не привязаны
         # к конкретному заказу. в сумме выплат указывается значение total_payoff, но если суммировать все заказы, сумма будет выше, поскольку для каждого заказа не учетны эти расходы
 
         #print(f'total_payoff {total_payoff}')
@@ -630,6 +630,7 @@ def ozon_get_base_posting_number(posting_number: str) -> str:
     return posting_number
 
 def ozon_get_all_price(headers):
+    result = {}  # Инициализируем result в начале функции
     opt_price = ms_get_product(headers)
     if opt_price.get('error') is None:
         opt_price_clear = {}
@@ -661,11 +662,11 @@ def ozon_get_all_price(headers):
                 )
         except requests.exceptions.Timeout:
             print("Ozon API timeout")
-            logger.warning("Ozon API timeout")
+            logger_info.info("Ozon API timeout")
             response = {}
         except requests.exceptions.RequestException as e:
             print(f"Ozon API general request error: {e}")
-            logger.warning(f"Ozon API general request error: {e}")
+            logger_info.warning(f"Ozon API general request error: {e}")
             response = {}        
                 
         #print(f"utils.py | get_all_price_ozon | response: {response}")

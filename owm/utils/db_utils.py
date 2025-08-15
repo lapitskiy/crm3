@@ -224,9 +224,10 @@ def db_update_promo_products(seller, promo_data: dict) -> bool:
         "min_price_limit_count": int,
         "min_price_promo": int,
         "limit_count_value": int,
-        "disable_fbs": bool,
-        "disable_limit_count": bool,
-        "disable_promo": bool
+        "use_fbs": bool,
+        "use_limit_count": bool,
+        "use_promo": bool,
+        "autoupdate_promo": bool
     }
     """
 
@@ -250,7 +251,7 @@ def db_update_promo_products(seller, promo_data: dict) -> bool:
         for field in [
             "yourprice", "minprice", "min_price_fbs", "min_price_limit_count",
             "min_price_promo", "limit_count_value", "use_fbs",
-            "use_limit_count", "use_promo"
+            "use_limit_count", "use_promo", "autoupdate_promo"
         ]:
             if field in promo_data:
                 value = promo_data[field]
@@ -288,5 +289,6 @@ def db_get_promo_products(seller) -> dict:
                 "use_fbs": product.use_fbs,
                 "use_limit_count": product.use_limit_count,
                 "use_promo": product.use_promo,
+                "autoupdate_promo": product.autoupdate_promo,
             }
     return result

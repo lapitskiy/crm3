@@ -403,9 +403,6 @@ def base_delete_files_with_prefix(directory_path, prefix):
 
 
 def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
-    """
-        получаем данные о неотгруженных заказах с МП и добавляем их в заказы МС в резерв
-    """
 
     """
         OZON
@@ -418,6 +415,9 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
 
     if cron_active_mp['ozon']:
 
+        promo_data_dict = db_get_promo_products()
+        
+        
         ozon_awaiting_fbs_dict = ozon_get_awaiting_fbs(headers)        
         ozon_found_product = ozon_awaiting_fbs_dict['found']
         ozon_notfound_product = ozon_awaiting_fbs_dict['not_found']        

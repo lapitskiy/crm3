@@ -731,17 +731,34 @@ class PromotionOzon(View):
         if not request.user.is_authenticated:
             return redirect('login')  # или другая страница
 
-        user_company = request.user.userprofile.company
-        seller = Seller.objects.filter(company=user_company).first()
-        
-        context = {}
-        
-        headers = get_headers(seller)
-        db_promo_data = db_get_promo_products(seller=seller)        
-        context['db_data'] = db_promo_data                    
-        price = ozon_get_all_price(headers)
-        context['price'] = price #dict(list(price.items())[:1]) # price
-        return render(request, 'owm/promotion_ozon.html', context)
+        try:
+            user_company = request.user.userprofile.company
+            seller = Seller.objects.filter(company=user_company).first()
+            
+            if not seller:
+                print(f"Seller not found for company: {user_company}")
+                return render(request, 'owm/promotion_ozon.html', {'error': 'Seller not found'})
+            
+            context = {}
+            
+            headers = get_headers(seller)
+            print(f"Headers obtained: {list(headers.keys()) if headers else 'None'}")
+            
+            db_promo_data = db_get_promo_products(seller=seller)
+            print(f"DB promo data obtained: {len(db_promo_data) if db_promo_data else 0} items")
+            context['db_data'] = db_promo_data
+                    
+            price = ozon_get_all_price(headers)
+            print(f"Price data obtained: {len(price) if price and isinstance(price, dict) else 'Error'}")
+            context['price'] = price #dict(list(price.items())[:1]) # price
+            
+            return render(request, 'owm/promotion_ozon.html', context)
+            
+        except Exception as e:
+            print(f"Error in PromotionOzon view: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return render(request, 'owm/promotion_ozon.html', {'error': f'Error: {str(e)}'})
 
     def post(self, request, *args, **kwargs):
         context = {}
@@ -1035,7 +1052,8 @@ def ajax_request_promo(request):
                 'limit_count_value': data.get('limit_count_value'),
                 'use_fbs': data.get('use_fbs'),
                 'use_limit_count': data.get('use_limit_count'),
-                'use_promo': data.get('use_promo'),       
+                'use_promo': data.get('use_promo'),
+                'autoupdate_promo': data.get('autoupdate_promo'),
                 'market': data.get('market')
             }
             #print(f"promo_data: {promo_data}")

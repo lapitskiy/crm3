@@ -30,6 +30,7 @@ urlpatterns = [
     path('plugins/', include('plugins.urls')),
     path('users/', include('users.urls')),
     path('select2/', include('django_select2.urls')),
+    path("ckeditor5/", include('django_ckeditor_5.urls')),
 ]
 for key, value in settings_plugin.PLUGIN_URLS.items():
     urlpatterns.append(path(value['path'], include(value['include'])))

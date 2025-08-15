@@ -6,6 +6,13 @@
 {% block content %}
 {% load custom_filters %}
 
+{% if error %}
+<div class="alert alert-danger" role="alert">
+    <h4 class="alert-heading">Ошибка!</h4>
+    <p>{{ error }}</p>
+</div>
+{% endif %}
+
 <script>
 function input() {
   var IDs = [];
@@ -45,8 +52,7 @@ DATA: {{ db_data }} !!!!
     {% csrf_token %}
         <button type="submit" class="btn btn-primary btn-block">Обновить условия акций</button>
 
-
-
+{% if price and price.items %}
             <div class="table-responsive">
 <table class="table table-rounded table-row-bordered border gy-7 gs-7">
     <thead>
@@ -145,6 +151,16 @@ DATA: {{ db_data }} !!!!
                 <input type="text" class="form-control d-inline-block" style="width: 180px;" 
                     name="{{ offer_id }}_minprice" id="{{ offer_id }}_minprice" 
                     placeholder="Минимальная цена" value="{{ value.min_price|default_if_none:'' }}">
+                <div style="display: flex; align-items: center; margin-left: 20px;">
+                    <input type="checkbox" 
+                        id="auto_update_promo_days_{{ offer_id }}" 
+                        name="auto_update_promo_days_{{ offer_id }}" 
+                        class="form-check-input"
+                        {% if db_data|get_item:offer_id and db_data|get_item:offer_id|get_item:'autoupdate_promo' %}checked{% endif %}>
+                    <label for="auto_update_promo_days_{{ offer_id }}" style="margin-bottom:0; margin-left: 8px; cursor:pointer;">
+                        Автообновление дней акции
+                    </label>
+                </div>
             </div>
             </td>
         </tr>
@@ -314,6 +330,7 @@ DATA: {{ db_data }} !!!!
                 use_fbs: document.getElementById('use_fbs_' + offerId)?.checked || false,
                 use_limit_count: document.getElementById('use_limit_count_' + offerId)?.checked || false,
                 use_promo: document.getElementById('use_promo_' + offerId)?.checked || false,
+                autoupdate_promo: document.getElementById('auto_update_promo_days_' + offerId)?.checked || false,
                 market: "ozon"
             };
 
@@ -441,8 +458,6 @@ DATA: {{ db_data }} !!!!
         });
         </script>
 
-
-1111111111111
         {% with row_class=value.profit_percent_fbs|sale_qty_get_row_class %}
         <tr id="{{ offer_id }}_discount" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.1 }};">
         {% endwith %} 
@@ -483,6 +498,12 @@ DATA: {{ db_data }} !!!!
     </tbody>
 </table>
 </div>
+{% else %}
+<div class="alert alert-info" role="alert">
+    <h4 class="alert-heading">Информация</h4>
+    <p>Данные о ценах не загружены. Возможно, есть проблемы с API или настройками.</p>
+</div>
+{% endif %}
         <button type="submit" class="btn btn-primary btn-block">Обновить цены</button>
     </form>
 
@@ -536,9 +557,11 @@ function updateFBSProfitFromInput(offerId) {
 
 // Автоматически показать дебаг при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
+    {% if price and price.items %}
     {% for offer_id, value in price.items %}
         updateFBSProfitFromInput('{{ offer_id }}');
     {% endfor %}
+    {% endif %}
 });
 </script>
 {% endblock %}
