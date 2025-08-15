@@ -87,7 +87,7 @@ def user_login(request):
         if form.is_valid():
             user = form.get_user()
             login(request, user)            
-            response = HttpResponseRedirect('news_home')  # куда перенаправить после логина
+            response = HttpResponseRedirect('autoupdate_settings')  # куда перенаправить после логина
             response.set_cookie('test_cookie', '123')  # теперь response определён
             print('session key:', request.session.session_key)
             return response
