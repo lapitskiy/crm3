@@ -13,7 +13,7 @@ from django.conf import settings
 
 import pandas as pd
 
-from owm.utils.db_utils import db_get_metadata, db_create_customerorder, db_get_status, redis_lock
+from owm.utils.db_utils import db_get_metadata, db_create_customerorder, db_get_promo_products, db_get_status, redis_lock
 from owm.utils.ms_utils import ms_create_customerorder, ms_get_organization_meta, ms_get_agent_meta, ms_update_allstock_to_mp, \
     ms_cancel_order, ms_create_delivering, ms_create_sold, ms_create_canceled
 from owm.models import Crontab

@@ -1,0 +1,104 @@
+body {
+    background-color: #fefefe;
+}
+
+.bs-callout {
+padding: 20px;
+margin: 20px 0;
+border: 1px solid #eee;
+border-left-width: 5px;
+border-radius: 3px;
+}
+.bs-callout-danger {
+border-left-color: #d9534f;
+}
+.bs-callout-warning {
+border-left-color: #f0ad4e;
+}
+.bs-callout-info {
+border-left-color: #5bc0de;
+}
+.bs-callout h4 {
+margin-top: 0;
+margin-bottom: 5px;
+}
+.bs-callout-danger h4 {
+color: #d9534f;
+}
+.bs-callout-warning h4 {
+color: #f0ad4e;
+}
+.bs-callout-info h4 {
+color: #5bc0de;
+}
+.bs-callout-limegreen {
+border-left-color: #32cd32;
+}
+.bs-callout-mediumpurple {
+border-left-color: #9370db;
+}
+.bs-callout-rosybrown {
+border-left-color: #bc8f8f;
+}
+.bs-callout-limegreen h4 {
+color: #32cd32;
+}
+.bs-callout-mediumpurple h4 {
+color: #9370db;
+}
+.bs-callout-rosybrown h4 {
+color: #bc8f8f;
+}
+
+
+.table-bordered th, .table-bordered td {
+    border: 1px solid #dee2e6 !important; /* Добавляем границы ячеек */
+}
+
+.table thead th {
+    border-bottom: 2px solid #dee2e6; /* Устанавливаем более широкую границу для заголовка */
+}
+
+.col-offer-id {
+    white-space: nowrap;
+    width: 1% !important;     /* Гарантирует адаптацию ширины под содержимое */
+    text-align: left;
+}
+
+.col-stock, .col-price {
+    width: 200px !important;  /* Фиксирует ширину в 100px */
+    max-width: 200px !important; /* Ограничивает максимальную ширину */
+    text-align: center;
+    overflow: hidden;         /* Обрезает текст, если он выходит за границы */
+    white-space: nowrap;      /* Предотвращает перенос текста */
+}
+
+.table td, .table th {
+    vertical-align: middle;    /* Вертикально центрирует содержимое */
+}
+
+.custom-table {
+    display: grid;
+    grid-template-columns: min-content 200px 200px; /* Устанавливает ширину Offer ID по содержимому */
+    width: 100%; /* Полная ширина таблицы */
+}
+
+.custom-table thead, .custom-table tbody, .custom-table tr {
+    display: contents; /* Для правильного отображения в CSS Grid */
+}
+
+.custom-table th, .custom-table td {
+    border: 1px solid #dee2e6 !important;
+    padding: 8px;
+    text-align: center;
+}
+
+.custom-table th:first-child, .custom-table td:first-child {
+    text-align: left;
+    white-space: nowrap;
+}
+
+#my-accordion {
+    --kt-accordion-button-active-color: #f70067; /* Например, #ffffff для белого */
+    --kt-accordion-button-active-bg: #024a6e; /* Например, #ff0000 для красного */
+}

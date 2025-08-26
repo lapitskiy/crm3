@@ -602,7 +602,8 @@ class SettingsStorage(View):
         metadata['ms_storage_ozon'] = {'id': request.POST.get('ozon_select'), 'name': request.POST.get('hidden-ozon')}
         metadata['ms_storage_yandex'] = {'id': request.POST.get('yandex_select'), 'name': request.POST.get('hidden-yandex')}
 
-        seller = Seller.objects.get(user=request.user)
+        user_company = request.user.userprofile.company
+        seller = Seller.objects.filter(company=user_company).first()
 
         db_update_metadata(seller=seller, metadata=metadata)
 

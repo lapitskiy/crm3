@@ -37,6 +37,8 @@ services:
       - DATABASE_USER=crm3
       - DATABASE_PASSWORD=Billkill13
       - DATABASE_HOST=postgres
+      - DJANGO_SETTINGS_MODULE=crm3.settings_docker
+      - DEBUG=0
     ports:
       - "8888:8000"  # Предполагается, что ваше приложение работает на 8000 порту
     volumes:
@@ -44,7 +46,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: gunicorn --bind 0.0.0.0:8000 crm3.wsgi
+    command: sh -c "python manage.py collectstatic --noinput && gunicorn --bind 0.0.0.0:8000 crm3.wsgi"
 
   celery:  # Celery Worker
     restart: unless-stopped
@@ -75,6 +77,8 @@ services:
         - "8080:80"
       volumes:
         - ./nginx/conf.d:/etc/nginx/conf.d:ro
+        - ./staticfiles:/app/staticfiles:ro
+        - ./media:/app/media:ro
       depends_on:
         - crm3      
 

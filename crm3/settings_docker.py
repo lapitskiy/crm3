@@ -18,6 +18,9 @@ from os import environ
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Create log directory if it doesn't exist
+LOG_DIR = os.path.join(BASE_DIR, 'log')
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.1/howto/deployment/checklist/
@@ -43,9 +46,8 @@ INSTALLED_APPS = [
     'news.apps.NewsConfig',
     'plugins.apps.PluginsConfig',
     'users.apps.UsersConfig',
-    'debug_toolbar',
-    'ckeditor',
-    'ckeditor_uploader',
+    'owm.apps.OwmConfig',
+    'django_ckeditor_5',
 ]
 INSTALLED_APPS += settings_plugin.INSTALLED_APPS_ADD
 
@@ -57,7 +59,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
 
 ROOT_URLCONF = 'crm3.urls'
@@ -134,15 +135,21 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'crm3/static'), ]
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'crm3/static'),
+]
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-MEDIA_URL = 'media/'
+MEDIA_URL = '/media/'
 
 
 
 # DEBUG TOOLBAR
-INTERNAL_IPS = ['127.0.0.1',]
+INTERNAL_IPS = ['127.0.0.1', '0.0.0.0', '::1']
+
+# Static files serving in production
+if not DEBUG:
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
 
 
 # Default primary key field type
@@ -177,34 +184,50 @@ LOGGING = {
         }
     },
     'handlers': {
-        'log_info': {
+        'console': {
             'level': 'INFO',
-            'class': 'logging.FileHandler',
-            'filename': 'log_info.log',
+            'class': 'logging.StreamHandler',
             'formatter': 'info_frmt',
-            'encoding': 'UTF-8',
-        },
-        'log_error': {
-            'level': 'ERROR',
-            'class': 'logging.FileHandler',
-            'filename': 'log_error.log',
-            'formatter': 'info_frmt',
-            'encoding': 'UTF-8',
         },
     },
     'loggers': {
         'crm3_info': {
-            'handlers': ['log_info'],
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': True,
             },
         'crm3_error': {
-            'handlers': ['log_error'],
+            'handlers': ['console'],
             'level': 'ERROR',
             'propagate': True,
         },
     },
 }
+
+# Try to create log directory and add file handlers if possible
+try:
+    os.makedirs(LOG_DIR, exist_ok=True)
+    # Add file handlers if log directory is accessible
+    LOGGING['handlers']['log_info'] = {
+        'level': 'INFO',
+        'class': 'logging.FileHandler',
+        'filename': os.path.join(LOG_DIR, 'log_info.log'),
+        'formatter': 'info_frmt',
+        'encoding': 'UTF-8',
+    }
+    LOGGING['handlers']['log_error'] = {
+        'level': 'ERROR',
+        'class': 'logging.FileHandler',
+        'filename': os.path.join(LOG_DIR, 'log_error.log'),
+        'formatter': 'info_frmt',
+        'encoding': 'UTF-8',
+    }
+    # Update loggers to use file handlers
+    LOGGING['loggers']['crm3_info']['handlers'].append('log_info')
+    LOGGING['loggers']['crm3_error']['handlers'].append('log_error')
+except (PermissionError, OSError):
+    # If we can't create log directory or files, use console logging only
+    pass
 
 # Redis settings
 REDIS_HOST = environ.get('REDIS_HOST', 'redis')

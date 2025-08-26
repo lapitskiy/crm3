@@ -10,13 +10,16 @@ ENV PYTHONUNBUFFERED=1
 RUN apt-get update && apt-get install -y \
     locales \
     build-essential \
-    libatlas-base-dev \
+    libopenblas-dev \
     liblzma-dev \
     libbz2-dev \
     libffi-dev && \
     echo "ru_RU.UTF-8 UTF-8" >> /etc/locale.gen && \
     locale-gen && \
     locale -a > /tmp/locales.txt
+
+# Создайте директории для статических файлов и медиа
+RUN mkdir -p /app/staticfiles /app/media
 
 ENV LANG=ru_RU.UTF-8
 ENV LANGUAGE=ru_RU:ru
@@ -29,6 +32,5 @@ RUN pip install --no-cache-dir -v -r requirements.txt
 
 # Скопируйте остальные файлы вашего приложения в контейнер
 COPY . /app
-
 
 ENV PYTHONPATH=/app
