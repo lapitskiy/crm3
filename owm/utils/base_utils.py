@@ -415,7 +415,7 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
 
     if cron_active_mp['ozon']:
 
-        promo_data_dict = db_get_promo_products()
+        promo_data_dict = db_get_promo_products(seller=seller)
         
         
         ozon_awaiting_fbs_dict = ozon_get_awaiting_fbs(headers)        

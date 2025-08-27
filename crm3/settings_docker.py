@@ -139,6 +139,12 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'crm3/static'),
 ]
+
+# Игнорировать source map файлы при collectstatic
+STATICFILES_IGNORE_PATTERNS = [
+    '*.map',
+    '**/*.map',
+]
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 
@@ -149,7 +155,9 @@ INTERNAL_IPS = ['127.0.0.1', '0.0.0.0', '::1']
 
 # Static files serving in production
 if not DEBUG:
-    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
+    # Используем обычный StaticFilesStorage вместо ManifestStaticFilesStorage
+    # чтобы избежать проблем с source map файлами
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 
 # Default primary key field type
