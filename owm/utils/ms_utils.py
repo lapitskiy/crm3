@@ -433,11 +433,12 @@ def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: 
     '''
     response_data = ms_get_customorders(headers)
     ms_orders_dict = {order["name"]: order["id"] for order in response_data["response"]["rows"]}
+    
     #print(f"*" * 40)
     #print(f'response ms_get_customorders: {response_data["response"]["rows"][0]}')
     #print(f"*" * 40)
 
-    result = {}
+    updated_orders = []
 
     db_mapping = {
         'ozon': {'storage': 'ms_storage_ozon', 'agent': 'ms_ozon_contragent', 'status': 'ms_status_shipped'},
@@ -530,6 +531,7 @@ def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: 
             )
             if code == 3006:
                 db_update_customerorder(order['posting_number'], mp_mapping[market]['delivering'], seller)
+                updated_orders.append(posting_number)
         else:                        
             url_status = f"https://api.moysklad.ru/api/remap/1.2/entity/customerorder/{ms_orders_dict[order['posting_number']]}"
             status_meta = {
@@ -546,6 +548,7 @@ def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: 
                 # меняем статус после добавления отгрузки
                 response = requests.put(url_status, headers=moysklad_headers, json=update_data)
                 db_update_customerorder(order['posting_number'], mp_mapping[market]['delivering'], seller)
+                updated_orders.append(posting_number)
             except requests.exceptions.JSONDecodeError:
                 logging.error(f"[seller {seller.id}][ms_create_customerorder][response text]: {response.text}")
             if response.status_code != 200:
@@ -554,7 +557,7 @@ def ms_create_delivering(headers: Dict[str, Any], seller: models.Model, market: 
                 print(f">>>[ms_create_delivering][update_data status] - Metadata: {metadata[db_mapping[market]['status']]['id']}")
             else:
                 pass
-    return result
+    return updated_orders
 
 
 def ms_received_order(headers: Dict[str, Any], posting_number: str):
@@ -609,7 +612,7 @@ def ms_create_sold(headers: Dict[str, Any], seller: models.Model, market: str, o
     response_data = ms_get_customorders(headers)
     ms_orders_dict = {order["name"]: order["id"] for order in response_data["response"]["rows"]}
     
-    result = {}
+    updated_orders = []
     
     db_mapping = {
         'ozon': {'storage': 'ms_storage_ozon', 'agent': 'ms_ozon_contragent', 'status': 'ms_status_completed'},
@@ -653,13 +656,14 @@ def ms_create_sold(headers: Dict[str, Any], seller: models.Model, market: str, o
             response = requests.put(url_status, headers=moysklad_headers, json=update_data)
             if response.status_code == 200:
                 db_update_customerorder(order['posting_number'], mp_mapping[market]['sold'], seller)
+                updated_orders.append(posting_number)
             else:
                 print(f">>>[ms_create_sold][update_data status] - Сервер вернул код состояния {response.status_code}")
                 print(f">>>[ms_create_sold][update_data status] - Ошибка: {response.text}")
         except requests.exceptions.JSONDecodeError:
             logging.error(f"[seller {seller.id}][ms_create_sold][response text]: {response.text}")
     
-    return result
+    return updated_orders
 
 
 def ms_create_canceled(headers: Dict[str, Any], seller: models.Model, market: str, orders: list):
@@ -669,7 +673,7 @@ def ms_create_canceled(headers: Dict[str, Any], seller: models.Model, market: st
     response_data = ms_get_customorders(headers)
     ms_orders_dict = {order["name"]: order["id"] for order in response_data["response"]["rows"]}
     
-    result = {}
+    updated_orders = []
     
     db_mapping = {
         'ozon': {'storage': 'ms_storage_ozon', 'agent': 'ms_ozon_contragent', 'status': 'ms_status_cancelled'},
@@ -709,10 +713,11 @@ def ms_create_canceled(headers: Dict[str, Any], seller: models.Model, market: st
             response = requests.put(url_status, headers=moysklad_headers, json=update_data)
             if response.status_code == 200:
                 db_update_customerorder(order['posting_number'], mp_mapping[market]['canceled'], seller)
+                updated_orders.append(posting_number)
             else:
                 print(f">>>[ms_create_canceled][update_data status] - Сервер вернул код состояния {response.status_code}")
                 print(f">>>[ms_create_canceled][update_data status] - Ошибка: {response.text}")
         except requests.exceptions.JSONDecodeError:
             logging.error(f"[seller {seller.id}][ms_create_canceled][response text]: {response.text}")
     
-    return result
+    return updated_orders

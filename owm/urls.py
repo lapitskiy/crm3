@@ -1,7 +1,9 @@
 from django.urls import path
 
-from .views import Enter, Inventory, PriceOzon, PriceWb, PriceYandex, FinanceOzon, PostavkaOzon, FinanceWb, AutoupdateSettings, OtpravlenieOzon, PromotionOzon, SettingsApi, \
-    SettingsContragent, SettingsStorage, SettingsStatus, MSMatchingArticle, SettingsMatchingArticle, WbPromo, ajax_request_promo
+from .views.base import Enter, Inventory, PriceYandex, AutoupdateSettings, Autoupdate, SettingsApi, \
+    SettingsContragent, SettingsStorage, SettingsStatus, MSMatchingArticle, SettingsMatchingArticle, ajax_request_promo
+from .views.wb_views import WbPromo, PriceWb, FinanceWb, WbMinimalPrice
+from .views.ozon_views import PriceOzon, PromotionOzon, FinanceOzon, PostavkaOzon, OtpravlenieOzon
 
 urlpatterns = [
     path('', SettingsApi.as_view(), name='settings_api'),
@@ -12,6 +14,7 @@ urlpatterns = [
     path('settings_matching_article/', SettingsMatchingArticle.as_view(), name='settings_matching_article'),
     path('inventory/', Inventory.as_view(), name='inventory'),
     path('autoupdatesettings/', AutoupdateSettings.as_view(), name='autoupdate_settings'),
+    path('autoupdate/', Autoupdate.as_view(), name='autoupdate'),
     path('price_ozon/', PriceOzon.as_view(), name='price_ozon'),
     path('promotion_ozon/', PromotionOzon.as_view(), name='promotion_ozon'),        
     path('finance_ozon/', FinanceOzon.as_view(), name='finance_ozon'),
@@ -20,6 +23,7 @@ urlpatterns = [
     path('price_wb/', PriceWb.as_view(), name='price_wb'),
     path('finance_wb/', FinanceWb.as_view(), name='finance_wb'),
     path('wb_promo/', WbPromo.as_view(), name='wb_promo'),        
+    path('wb/minimal-price/', WbMinimalPrice.as_view(), name='wb_minimal_price'),
     path('price_yandex/', PriceYandex.as_view(), name='price_yandex'),
     path('enter/', Enter.as_view(), name='enter'),
     path('ajax-request-promo/', ajax_request_promo, name='ajax_request_promo'),

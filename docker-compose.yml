@@ -31,26 +31,28 @@ services:
     restart: unless-stopped
     build: .
     image: crm3:latest
-    container_name: crm3_container
+    container_name: crm3
     environment:
       - DATABASE_NAME=postgres
       - DATABASE_USER=crm3
       - DATABASE_PASSWORD=Billkill13
       - DATABASE_HOST=postgres
       - DJANGO_SETTINGS_MODULE=crm3.settings_docker
-      - DEBUG=0
+      - DEBUG=1
     ports:
       - "8888:8000"  # Предполагается, что ваше приложение работает на 8000 порту
     volumes:
       - .:/app
+      - static_volume:/app/staticfiles
     depends_on:
       - postgres
       - redis
-    command: sh -c "python manage.py collectstatic --noinput && gunicorn --bind 0.0.0.0:8000 crm3.wsgi"
+    command: gunicorn --bind 0.0.0.0:8000 crm3.wsgi --timeout 180
 
   celery:  # Celery Worker
     restart: unless-stopped
     image: crm3:latest
+    container_name: celery
     logging:
       driver: "json-file"
       options:
@@ -72,12 +74,12 @@ services:
 
   nginx:
       image: nginx:latest
-      container_name: nginx_crm
+      container_name: nginx
       ports:
-        - "8080:80"
+        - "8099:80"
       volumes:
-        - ./nginx/conf.d:/etc/nginx/conf.d:ro
-        - ./staticfiles:/app/staticfiles:ro
+        - ./nginx/conf.d:/etc/nginx/conf.d
+        - static_volume:/app/staticfiles:ro
         - ./media:/app/media:ro
       depends_on:
         - crm3      
@@ -85,6 +87,7 @@ services:
   celery_beat:  # Celery Beat
     restart: unless-stopped
     image: crm3:latest
+    container_name: celery_beat
     command: celery -A crm3 beat --loglevel=info
     environment:
       - DATABASE_NAME=postgres
@@ -101,3 +104,4 @@ services:
 volumes:
   postgres_data: {}
   redis_data: {}
+  static_volume: {}

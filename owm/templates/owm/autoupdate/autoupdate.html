@@ -1,105 +1,69 @@
-inventory.html{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}{{ title }} - {{ block.super }}{% endblock %}
 {% block sidebar %}
     {% include 'include/_sidebar_owm.html' %}
 {% endblock %}
 {% block content %}
-    <h1>ИНВЕНТАРИЗАЦИЯ FBS (MoySklad + Ozon + Wb + Market)</h1>
+    <h1>Автообновление и синхронизация</h1>
 
-    {% if resp %}
-        <div class="accordion" id="kt_accordion_1">
-        {% for key, value in resp.items %}
-            {% if value.code == 200 or value.code == 204 %}
-                <!--begin::Accordion-->
-
-                    <div class="accordion-item">
-                        <h2 class="accordion-header" id="kt_accordion_1_header_1">
-                            <button class="accordion-button fs-4 fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#kt_accordion_1_body_1" aria-expanded="true" aria-controls="kt_accordion_1_body_1">
-                                {{ key }} остатки обновлены
-                            </button>
-                        </h2>
-                        <div id="kt_accordion_1_body_1" class="accordion-collapse collapse show" aria-labelledby="kt_accordion_1_header_1" data-bs-parent="#kt_accordion_1">
-                            <div class="accordion-body">
-                                {{ value }}
-                            </div>
+    {% if error %}
+        <div class="alert alert-danger" role="alert">
+            {{ error }}
+        </div>
+    {% elif message %}
+        <div class="alert alert-info" role="alert">
+            {{ message }}
+        </div>
+    {% elif task_history %}
+        <div class="accordion" id="taskHistoryAccordion">
+            {% for task in task_history %}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+                        <button class="accordion-button {% if not forloop.first %}collapsed{% endif %} fs-4 fw-semibold"
+                                type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}"
+                                aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse{{ forloop.counter }}">
+                            Задача #{{ forloop.counter }}: ID - {{ task.task_id[:8] }}... (Статус: {{ task.status }}) - {{ task.start_time|date:"d.m.Y H:i:s" }}
+                        </button>
+                    </h2>
+                    <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+                         aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#taskHistoryAccordion">
+                        <div class="accordion-body">
+                            <p><strong>ID Задачи:</strong> {{ task.task_id }}</p>
+                            <p><strong>ID Crontab:</strong> {{ task.cron_id }}</p>
+                            <p><strong>Статус:</strong> {{ task.status }}</p>
+                            <p><strong>Начало:</strong> {{ task.start_time|date:"d.m.Y H:i:s" }}</p>
+                            <p><strong>Окончание:</strong> {{ task.end_time|date:"d.m.Y H:i:s" }}</p>
+                            {% if task.error_message %}
+                                <div class="alert alert-danger"><strong>Ошибка:</strong> {{ task.error_message }}</div>
+                            {% endif %}
+                            {% if task.result %}
+                                <h4>Результат:</h4>
+                                {% if task.result.items %}
+                                    <ul class="list-group">
+                                        {% for key, value in task.result.items %}
+                                            <li class="list-group-item">
+                                                <strong>{{ key }}:</strong>
+                                                {% if value.code and value.text %}
+                                                    Код: {{ value.code }}, Сообщение: {{ value.text }}
+                                                {% else %}
+                                                    {{ value }}
+                                                {% endif %}
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <p>{{ task.result }}</p>
+                                {% endif %}
+                            {% else %}
+                                <p>Результаты задачи отсутствуют.</p>
+                            {% endif %}
                         </div>
                     </div>
-                <!--end::Accordion-->
-            {% endif %}
-        {% endfor %}
+                </div>
+            {% endfor %}
         </div>
-
     {% else %}
-
-    <form action="#" method="POST">
-    {% csrf_token %}
-        <button type="submit" class="btn btn-primary btn-block">Обновить остатки</button>
-        <br><br><br>
-
-        <div class="container">
-            <!-- Основной чекбокс -->
-            <div class="form-check mb-3">
-                <input class="form-check-input" type="checkbox" id="selectAll" />
-                <label class="form-check-label text-dark" for="selectAll">
-                    Выбрать все
-                </label>
-            </div>
-
-            <div id="checkboxList">
-                {% for offer_id, value in stock.items %}
-                    <div class="row mb-2 align-items-center pb-2" style="border-bottom: 1px solid #c2bfbf;">
-                        <!-- Колонка для чекбокса и label -->
-                        <div class="col-sm-2 d-flex align-items-center">
-                            <input class="form-check-input align-middle child-checkbox" type="checkbox"
-                                   name="{{ offer_id }}_checked" id="checkbox{{ offer_id }}" />
-                            <label class="form-check-label text-dark ms-2" for="checkbox{{ offer_id }}" style="margin: 0;">
-                                {{ offer_id }}
-                            </label>
-                        </div>
-                        <!-- Колонка для input -->
-                        <div class="col-sm-3 d-flex align-items-center">
-                            <input type="text" class="form-control" name="{{ offer_id }}_stock"
-                                   id="input{{ offer_id }}" value="{{ value.stock }}" style="width: 150px;">
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
-        <button type="submit" class="btn btn-primary btn-block">Обновить остатки</button>
-    </form>
-
+        <p>История задач синхронизации пока отсутствует.</p>
     {% endif %}
 
-<script>
-    // Получаем основной чекбокс
-    const selectAll = document.getElementById('selectAll');
-    // Получаем все дочерние чекбоксы
-    const childCheckboxes = document.querySelectorAll('.child-checkbox');
-
-    // Слушаем изменения основного чекбокса
-    selectAll.addEventListener('change', () => {
-        childCheckboxes.forEach(checkbox => {
-            checkbox.checked = selectAll.checked; // Устанавливаем состояние всех чекбоксов
-        });
-    });
-
-    // Обновляем состояние основного чекбокса при изменении любого дочернего чекбокса
-    childCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', () => {
-            const allChecked = Array.from(childCheckboxes).every(cb => cb.checked);
-            const someChecked = Array.from(childCheckboxes).some(cb => cb.checked);
-
-            if (allChecked) {
-                selectAll.checked = true;
-                selectAll.indeterminate = false;
-            } else if (someChecked) {
-                selectAll.checked = false;
-                selectAll.indeterminate = true; // Устанавливаем "промежуточное" состояние
-            } else {
-                selectAll.checked = false;
-                selectAll.indeterminate = false;
-            }
-        });
-    });
-</script>
 {% endblock %}

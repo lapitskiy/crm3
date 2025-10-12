@@ -52,6 +52,11 @@ Login :: {{ block.super }}
 									<h1 class="text-dark fw-bolder mb-3">Sign In</h1>
 									<!--end::Title-->
 								</div>
+                                {% if error == 'invalid_credentials' %}
+                                <div class="alert alert-danger" role="alert">
+                                    Неверный логин или пароль.
+                                </div>
+                                {% endif %}
 								<!--begin::Heading-->
 								<!--begin::Separator-->
 								<div class="separator separator-content my-14">

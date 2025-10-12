@@ -83,14 +83,17 @@ def user_login(request):
 
     if request.method == 'POST':
         form = UserLoginForm(data=request.POST)
+        context['form'] = form
         print(request.COOKIES)
         if form.is_valid():
             user = form.get_user()
-            login(request, user)            
+            login(request, user)
             response = redirect('autoupdate_settings')  # куда перенаправить после логина
             response.set_cookie('test_cookie', '123')  # теперь response определён
             print('session key:', request.session.session_key)
             return response
+        else:
+            context['error'] = 'invalid_credentials'
     else:
         context['form'] = UserLoginForm()
     return render(request, 'users/login.html', context)

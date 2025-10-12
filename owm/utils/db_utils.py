@@ -114,6 +114,7 @@ def db_check_awaiting_postingnumber(posting_numbers: list):
 def db_create_customerorder(not_found_product: dict, market: str, seller: Seller):
     # product = {posting_number: {status:'', product_list: [{offer_id: price: quantity:}] }}
     try:
+        added_offer_ids = []
         for posting_number, products in not_found_product.items():
             # Создаем запись в таблице OwmAwaiting
             awaiting_record = Awaiting.objects.create(
@@ -134,6 +135,8 @@ def db_create_customerorder(not_found_product: dict, market: str, seller: Seller
                     price=int(float(product['price'])),
                     quantity=product['quantity']
                     )
+                added_offer_ids.append(product['offer_id'])
+        return added_offer_ids
     except Exception as e:
         # Логируем ошибку или поднимаем исключение, если нужно
         print(f"Error occurred: {e}")
@@ -251,7 +254,8 @@ def db_update_promo_products(seller, promo_data: dict) -> bool:
         for field in [
             "yourprice", "minprice", "min_price_fbs", "min_price_limit_count",
             "min_price_promo", "limit_count_value", "use_fbs",
-            "use_limit_count", "use_promo", "autoupdate_promo"
+            "use_limit_count", "use_promo", "autoupdate_promo",
+            "auto_update_days_limit_promo", "use_discount", "min_price_discount"
         ]:
             if field in promo_data:
                 value = promo_data[field]
@@ -290,5 +294,8 @@ def db_get_promo_products(seller) -> dict:
                 "use_limit_count": product.use_limit_count,
                 "use_promo": product.use_promo,
                 "autoupdate_promo": product.autoupdate_promo,
+                "auto_update_days_limit_promo": product.auto_update_days_limit_promo,
+                "use_discount": product.use_discount,
+                "min_price_discount": product.min_price_discount,
             }
     return result

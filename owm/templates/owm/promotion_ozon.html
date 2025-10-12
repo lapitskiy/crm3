@@ -42,9 +42,6 @@ function input() {
 }
 </script>
 
-
-DATA: {{ db_data }} !!!!
-
     <h1>Акции OZON</h1>
 <input type="text" id="search" onkeyup="input()">
 <p id="block"></p>
@@ -63,7 +60,17 @@ DATA: {{ db_data }} !!!!
         </tr>
     </thead>
     <tbody>
-
+    <!-- Filter buttons -->
+    <div class="d-flex justify-content-center mb-4">
+        <a href="{% url 'promotion_ozon' %}?percent_color=green" class="btn btn-success me-2">Зеленый</a>
+        <a href="{% url 'promotion_ozon' %}?percent_color=yellow" class="btn btn-warning me-2">Желтый</a>
+        <a href="{% url 'promotion_ozon' %}?percent_color=red" class="btn btn-danger">Красный</a>
+    </div>
+    
+    <div class="alert alert-info mt-3" role="alert">
+        Загружено товаров: {{ price|length }}
+    </div>
+    
     {% for offer_id, value in price.items %}
         {% with row_class=value.profit_percent_fbs|sale_qty_get_row_class %}
         <tr id="{{ offer_id }}" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.0 }}; border-top: 4px solid #222;">
@@ -151,16 +158,6 @@ DATA: {{ db_data }} !!!!
                 <input type="text" class="form-control d-inline-block" style="width: 180px;" 
                     name="{{ offer_id }}_minprice" id="{{ offer_id }}_minprice" 
                     placeholder="Минимальная цена" value="{{ value.min_price|default_if_none:'' }}">
-                <div style="display: flex; align-items: center; margin-left: 20px;">
-                    <input type="checkbox" 
-                        id="auto_update_promo_days_{{ offer_id }}" 
-                        name="auto_update_promo_days_{{ offer_id }}" 
-                        class="form-check-input"
-                        {% if db_data|get_item:offer_id and db_data|get_item:offer_id|get_item:'autoupdate_promo' %}checked{% endif %}>
-                    <label for="auto_update_promo_days_{{ offer_id }}" style="margin-bottom:0; margin-left: 8px; cursor:pointer;">
-                        Автообновление дней акции
-                    </label>
-                </div>
             </div>
             </td>
         </tr>
@@ -170,7 +167,7 @@ DATA: {{ db_data }} !!!!
         {% endwith %}
             <td colspan="6">
             <input type="hidden" id="{{ offer_id }}_fbs_control" name="{{ offer_id }}_fbs_control" value="{{ offer_id }}" />
-            <a href="https://seller.ozon.ru/app/prices/manager/{{ value.product_id }}/prices">Посмотреть цену товара в личном кабинете ozon</a>
+            <a href="https://seller.ozon.ru/app/prices/manager/{{ value.product_id }}/prices" target="_blank">Посмотреть цену товара в личном кабинете ozon</a>
             <br><br>
             <div class="d-flex align-items-start mb-2">
 
@@ -330,7 +327,10 @@ DATA: {{ db_data }} !!!!
                 use_fbs: document.getElementById('use_fbs_' + offerId)?.checked || false,
                 use_limit_count: document.getElementById('use_limit_count_' + offerId)?.checked || false,
                 use_promo: document.getElementById('use_promo_' + offerId)?.checked || false,
+                use_discount: document.getElementById('use_discount_' + offerId)?.checked || false,
+                min_price_discount: document.getElementById('min_price_discount_' + offerId)?.value || '',
                 autoupdate_promo: document.getElementById('auto_update_promo_days_' + offerId)?.checked || false,
+                auto_update_days_limit_promo: document.getElementById('auto_update_days_limit_promo_' + offerId)?.checked || false,
                 market: "ozon"
             };
 
@@ -465,7 +465,7 @@ DATA: {{ db_data }} !!!!
             <input type="hidden" id="{{ offer_id }}_discount" name="{{ offer_id }}_discount" value="offer_id" />
             <div class="d-flex align-items-start mb-2">
                 <input type="checkbox" id="use_discount_{{ offer_id }}" name="use_discount_{{ offer_id }}" class="me-2 mt-1"
-                    {% if db_data|get_item:offer_id and db_data|get_item:offer_id|get_item:'use_promo' %}checked{% endif %}>
+                    {% if db_data|get_item:offer_id and db_data|get_item:offer_id|get_item:'use_discount' %}checked{% endif %}>
                 <label for="use_discount_{{ offer_id }}" class="form-check-label" style="margin-bottom:0;">
                 <div>
                     <strong>Автоматическое принятие скидки</strong>
@@ -481,6 +481,29 @@ DATA: {{ db_data }} !!!!
                 value="{% if db_data|get_item:offer_id and db_data|get_item:offer_id|get_item:'min_price_discount' %}{{ db_data|get_item:offer_id|get_item:'min_price_discount' }}{% else %}{{ value.min_price }}{% endif %}" 
                 style="width: 150px;"/>
             
+
+            </td>
+        </tr>
+
+        {% with row_class=value.profit_percent_fbs|sale_qty_get_row_class %}
+        <tr id="{{ offer_id }}_autoupdate_promo_days_limit" class="fw-bold fs-6 text-gray-800 border-gray-400" style="background-color:{{ row_class.1 }};">
+        {% endwith %} 
+            <td colspan="6">
+            <input type="hidden" id="{{ offer_id }}_autoupdate_promo_days_limit" name="{{ offer_id }}_autoupdate_promo_days_limit" value="offer_id" />
+            <div class="d-flex align-items-start mb-2">
+                <input type="checkbox" id="auto_update_days_limit_promo_{{ offer_id }}" name="auto_update_days_limit_promo_{{ offer_id }}" class="me-2 mt-1"
+                    {% if db_data|get_item:offer_id and db_data|get_item:offer_id|get_item:'auto_update_days_limit_promo' %}checked{% endif %}>
+                <label for="auto_update_days_limit_promo_{{ offer_id }}" class="form-check-label" style="margin-bottom:0;">
+                <div>
+                    <strong>Обновление 30-дневного срока когда осталось 10 дней до конца</strong>
+                    <br>
+                    <span style="font-size: 90%;">
+                    <i>Если до конца акции осталось 10 дней, срок действия акции продлевается на 30 дней</i>
+                    </span>
+                </div>
+                </label>
+            </div>
+            <hr>
             <hr>
             <!-- Кнопка обновления для всех полей и чекбоксов -->
             <button type="button" class="btn btn-success d-inline-flex align-items-center ms-3" id="update_all_btn_{{ offer_id }}" onclick="updateAllFieldsAjax('{{ offer_id }}')">
@@ -488,11 +511,14 @@ DATA: {{ db_data }} !!!!
                 Обновить параметры {{ offer_id }}
             </button>
             </td>
+
         </tr>
 
-
         <tr>
-            <td colspan="6" style="height: 24px; background: transparent; border: none;"></td>
+            
+            <td colspan="6" style="height: 24px; background: transparent; border: none;">
+
+            </td>
         </tr>
     {% endfor %}
     </tbody>

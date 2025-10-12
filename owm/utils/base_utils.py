@@ -15,13 +15,14 @@ import pandas as pd
 
 from owm.utils.db_utils import db_get_metadata, db_create_customerorder, db_get_promo_products, db_get_status, redis_lock
 from owm.utils.ms_utils import ms_create_customerorder, ms_get_organization_meta, ms_get_agent_meta, ms_update_allstock_to_mp, \
-    ms_cancel_order, ms_create_delivering, ms_create_sold, ms_create_canceled
+    ms_cancel_order, ms_create_delivering, ms_create_sold, ms_create_canceled, ms_get_all_stock as get_all_moysklad_stock
 from owm.models import Crontab
 from owm.utils.oz_utils import ozon_get_awaiting_fbs, ozon_get_status_fbs
-from owm.utils.wb_utils import wb_get_status_fbs
+from owm.utils.wb_utils import wb_get_status_fbs, wb_update_inventory as update_inventory_wb
 from owm.utils.ya_utils import yandex_get_orders_fbs
 
 import logging
+from owm.utils.ya_utils import yandex_update_inventory
 
 
 logger_info = logging.getLogger('crm3_info')
@@ -158,7 +159,7 @@ def inventory_update(user: object, invent_dict: dict):
         #print(f'\n\nstock сравнение {stock}\n\n')
         context['ozon'] = update_inventory_ozon(headers, stock)
         #print(f'OZON UPDATE?')
-        context['yandex'] = update_inventory_yandex(headers, stock)
+        context['yandex'] = yandex_update_inventory(headers, stock)
         context['wb'] = update_inventory_wb(headers['wb_headers'], stock)
     return context
 
@@ -254,91 +255,6 @@ def inventory_POST_to_offer_dict(post_data):
     return offer_dict
 
 
-
-def get_all_price_wb(headers):
-    result = {}
-    opt_price = get_moysklad_opt_price(headers['moysklad_headers'])
-    #print(f"opt_price {opt_price['rows'][0]['buyPrice']['value']}")
-    #print(f"opt_price {opt_price['rows'][0]['article']}")
-    opt_price_clear = {}
-    for item in opt_price['rows']:
-        #opt_price_clear['article'] = item['article']
-        #print(f"opt_price {item['buyPrice']['value']/100}")
-        opt_price_clear[item['article']] = {
-            'opt_price' : int(float(item['buyPrice']['value']) / 100),
-            }
-
-    # продажи за последние 30 дней
-    #url = "https://statistics-api.wildberries.ru/api/v1/supplier/sales"
-    url = "https://statistics-api.wildberries.ru/api/v3/supplier/reportDetailByPeriod"
-    dateTo = datetime.datetime.now()
-    dateFrom = dateTo - datetime.timedelta(days=+30)
-    dateTo = dateTo.strftime('%Y-%m-%d')
-    dateFrom = dateFrom.strftime('%Y-%m-%d')
-    print(f"date RFC3339 {dateTo}") #.isoformat()
-    data = {
-        'dateFrom': dateFrom, #lastmonth_date.strftime('%Y-%m')
-        'dateTo': dateTo,
-        'limit': 100
-        }
-    print(f"data wb {data}")
-    response = requests.get(url, headers=headers['wb_headers'], json=data).json()
-    print(f"date resp wb json {response}")
-    realization = {}
-    if response:
-        if response['code'] == 503:
-            result['error'] = response['message']
-
-        if response['code'] == 200:
-            for item in response['result']['rows']:
-                if item['offer_id'] in realization:
-                    realization[item['offer_id']]['sale_qty'] = realization[item['offer_id']]['sale_qty'] + item['sale_qty']
-                else:
-                    realization[item['offer_id']] = {'sale_qty': item['sale_qty']}
-    #print(f"realization {realization}")
-    #print(f"date resp {response}")
-
-    url = "https://discounts-prices-api.wb.ru/api/v2/list/goods/filter"
-    data = {
-            'limit': 10,
-            'offset': 0
-            }
-    response = requests.get(url, headers=headers['wb_headers'], json=data).json()
-    print(f"response wb {response}")
-    result = {}
-    for item in response['result']['items']:
-        if item['offer_id'] not in opt_price_clear:
-            continue
-        if item['offer_id'] not in realization:
-            realization[item['offer_id']] = {'sale_qty': 0}
-        delivery_price = float(item['price']['marketing_seller_price'])/100 * float(item['commissions']['sales_percent_fbs'])
-        delivery_price = delivery_price + float(item['commissions']['fbs_direct_flow_trans_min_amount']) \
-                         + float(item['commissions']['fbs_deliv_to_customer_amount']) + \
-                         float(item['price']['marketing_seller_price'])/100*1 # эквайринг 1% и 10% для средней цены
-        delivery_price = delivery_price + 15 # средняя цена доставки товара
-        if item['offer_id'] == 'renata_371':
-            print(f"371 {item}")
-        #print(f"opt_price {item['offer_id']}")
-        profit_price = int(float(item['price']['marketing_seller_price'])) - \
-                       int(delivery_price) - opt_price_clear[item['offer_id']]['opt_price']
-        profit_percent = profit_price / opt_price_clear[item['offer_id']]['opt_price'] * 100
-        min_price = int(delivery_price) + (opt_price_clear[item['offer_id']]['opt_price']/100*30) + opt_price_clear[item['offer_id']]['opt_price']
-
-        #print(f"offer_id {item}")
-        result[item['offer_id']] = {
-            'price': int(float(item['price']['price'])),
-            'min_price': int(min_price),
-            'marketing_seller_price': int(float(item['price']['marketing_seller_price'])),
-            'delivery_price': int(delivery_price),
-            'opt_price': opt_price_clear[item['offer_id']]['opt_price'],
-            'profit_price': profit_price,
-            'profit_percent': int(profit_percent),
-            'sale_qty': realization[item['offer_id']]['sale_qty']
-        }
-
-    #print(f'result ozon price {result}')
-    return result
-
 def get_all_price_yandex(headers):
     # калулутяор fbs fby https: // dev - market - partner - api.docs - viewer.yandex.ru / ru / reference / tariffs / calculateTariffs
 
@@ -412,6 +328,7 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
     cron_active_mp['yandex'] = True
     ms_update = False
     result = {}
+    result['ozon'] = {}
 
     if cron_active_mp['ozon']:
 
@@ -433,7 +350,8 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
            }
            ms_result = ms_create_customerorder(headers=headers, not_found_product=not_found_product, seller=seller, market='ozon')
            if ms_result:
-               db_create_customerorder(not_found_product, market='ozon', seller=seller)
+               added_offer_ids = db_create_customerorder(not_found_product, market='ozon', seller=seller)
+               result['ozon']['ms_create_customerorder'] = added_offer_ids
                ms_update = True
 
         if ozon_awaiting_fbs_dict['found']:
@@ -444,15 +362,18 @@ def update_awaiting_deliver_from_owm(headers, seller, cron_active_mp):
                    #print(f"ozon_status_fbs_dict {ozon_status_fbs_dict['awaiting']}")
                    # вернуть в ozon_get_status_fbs
                    # if posting_number in existing_orders and existing_orders[posting_number] != status:
-                   #ms_create_delivering(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['awaiting'])
-               if ozon_status_fbs_dict.get('delivering'): # доставлется (отгружено)                                      
-                   # вернуть в ozon_get_status_fbs
-                   # if posting_number in existing_orders and existing_orders[posting_number] != status:
-                   ms_create_delivering(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['delivering'])
+               if ozon_status_fbs_dict.get('delivering'): # доставлется (отгружено) 
+                   delivered_orders = ms_create_delivering(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['delivering'])
+                   if delivered_orders:
+                       result['ozon']['ms_create_delivering_orders'] = delivered_orders
                if ozon_status_fbs_dict.get('delivered'):                   
-                   ms_create_sold(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['delivered'])
+                   sold_orders = ms_create_sold(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['delivered'])
+                   if sold_orders:
+                       result['ozon']['ms_create_sold_orders'] = sold_orders
                if ozon_status_fbs_dict.get('cancelled'):
-                   ms_create_canceled(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['cancelled'])
+                   cancelled_orders = ms_create_canceled(headers=headers, seller=seller, market='ozon', orders=ozon_status_fbs_dict['cancelled'])
+                   if cancelled_orders:
+                       result['ozon']['ms_create_canceled_orders'] = cancelled_orders
 
            #print(f'*' * 40)
            #print(f'found_product {found_product}')
@@ -588,14 +509,14 @@ def autoupdate_sync_inventory(cron_id):
         cron = Crontab.objects.select_related('seller').get(id=cron_id)
     except Crontab.DoesNotExist:
         logger_error.error(f"autoupdate_sync_inventory: Crontab с id {cron_id} не найден.")
-        return 'Cron not found'
+        return False, {'error': f'Crontab с id {cron_id} не найден.'}
 
     lock_key = f"lock:autoupdate_sync_inventory:{cron.seller.id}"
 
     with redis_lock(lock_key, timeout=300) as acquired:
         if not acquired:
             print(f"[SKIP] Already running for seller {cron.seller.id}")
-            return 'Already running'
+            return False, {'status': 'Already running'}
 
         cron_active_mp = {
             'yandex': cron.yandex,
@@ -610,6 +531,16 @@ def autoupdate_sync_inventory(cron_id):
                 cron_active_mp=cron_active_mp
             )
             print(f"result_update_awaiting {result_update_awaiting}")
-            return result_update_awaiting
+            # Предполагаем, что result_update_awaiting - это словарь с результатами, 
+            # и его успешность можно определить по наличию ключа 'error' или по другому признаку.
+            # Если успешно, возвращаем True и result_update_awaiting.
+            # Если нет, возвращаем False и result_update_awaiting (или более детальный error).
+            # Для простоты, пока будем считать, что отсутствие 'error' означает успех.
+            success = not result_update_awaiting.get('error')
+            return success, result_update_awaiting
         else:
-            return 'No active'
+            return False, {'status': 'No active marketplaces for this cron.'}
+
+
+def get_reserv_from_mp(headers: dict):
+    pass

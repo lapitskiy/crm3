@@ -76,6 +76,9 @@ class PromoProduct(models.Model):
     use_limit_count = models.BooleanField(default=False, verbose_name='Отключить лимит')
     use_promo = models.BooleanField(default=False, verbose_name='Отключить участие в акции')
     autoupdate_promo = models.BooleanField(default=False, verbose_name='Автообновление дней акции')
+    auto_update_days_limit_promo = models.BooleanField(default=False, verbose_name='Автообновление дней акции при достижении лимита')
+    use_discount = models.BooleanField(default=False, verbose_name='Автоматическое принятие скидки')
+    min_price_discount = models.IntegerField(null=True, blank=True, verbose_name='Мин. цена автопринятия скидки')
 
     class Meta:
         unique_together = ('promo_market', 'offer_id')

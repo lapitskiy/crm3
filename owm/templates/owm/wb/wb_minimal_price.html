@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} - {{ block.super }}{% endblock %}
+{% block sidebar %}
+    {% include 'include/_sidebar_owm.html' %}
+{% endblock %}
+{% block content %}
+{% load custom_filters %}
+
+<div class="container py-5">
+    {% if message %}
+    <div class="alert alert-success">{{ message }}</div>
+    {% endif %}
+    <h1>Минимальные цены Wildberries</h1>
+    <form method="post">
+        {% csrf_token %}
+        <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Артикул WB</th>
+                <th>Артикул продавца</th>
+                <th>Последний баркод</th>
+                <th>Новая мин. цена</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.article_wb }}</td>
+                <td>{{ item.seller_article }}</td>
+                <td>{{ item.barcode }}</td>
+                <td>
+                    <input type="text" class="form-control" 
+                           name="new_min_price_{{ item.seller_article }}" 
+                           value="{{ updates|get_item:item.seller_article|default:item.new_min_price|default:'' }}">
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4">Нет данных</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+    </form>
+</div>
+
+{% endblock %}
+

@@ -95,11 +95,7 @@ webencodings==0.5.1
 XlsxWriter==3.2.0
 yarg==0.1.9
 django-tenants
-
-#sqlalchemy
-#asyncpg
-#aiohttp
-#aiomisc
+openpyxl>=3.1.2
 
 
 

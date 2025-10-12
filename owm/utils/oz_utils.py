@@ -30,6 +30,16 @@ from django.http import JsonResponse
 logger_info = logging.getLogger('crm3_info')
 logger_error = logging.getLogger('crm3_error')
 
+
+def _prepare_price_value(value):
+    if value in (None, '', 'null', 'None'):
+        return None
+    try:
+        value_str = str(value).replace(',', '.').strip()
+        return "{0:.2f}".format(float(value_str))
+    except (ValueError, TypeError):
+        return None
+
 def ozon_update_inventory(headers,stock):
     warehouseID = ozon_get_warehouse(headers)
     url = 'https://api-seller.ozon.ru/v2/products/stocks'
@@ -353,263 +363,286 @@ def ozon_get_status_fbs(headers: Dict[str, Any], seller: Seller):
     return matching_orders
 
 def ozon_get_finance(headers: dict, period: str):
-    ozon_products = ozon_get_products(headers)
+    logger_info.info(f"ozon_get_finance: Starting with period {period}")
+    try:
+        ozon_products = ozon_get_products(headers)
+        logger_info.info(f"ozon_get_finance: ozon_get_products returned with {'error' in ozon_products}")
 
-    sku_offer_id = {
-        source["sku"]: item["offer_id"]
-        for item in ozon_products['items']
-        for source in item["sources"]
-    }
-
-    #print(json.dumps(prod_ozon['items'], indent=4, ensure_ascii=False))
-
-    products = ms_get_product(headers)
-    ms_opt_price_clear = {}
-    #print(f"products {products}")
-    if products['status_code'] != 200:
-        return {'error': products}
-
-    for item in products['response']['rows']:
-        #opt_price_clear['article'] = item['article']
-        #print(f"opt_price {item['buyPrice']['value']/100}")
-        ms_opt_price_clear[item['article']] = {
-            'opt_price': int(float(item['buyPrice']['value']) / 100) if 'buyPrice' in item and 'value' in item['buyPrice'] else 0
-            }
-
-    now = datetime.datetime.now()
-
-    #url = "https://api-seller.ozon.ru/v2/finance/realization"
-    #lastmonth_date = now - relativedelta(months=1)
-    #data = {
-    #    "year": lastmonth_date.year,
-    #    "month": lastmonth_date.month
-    #}
-
-    #response = requests.post(url, headers=headers['ozon_headers'], json=data).json()
-
-    #print(json.dumps(response['result']['rows'], indent=4, ensure_ascii=False))
-    #print(f"response 1 {response['result']['rows']}")
-
-    # https://docs.ozon.ru/api/seller/#operation/FinanceAPI_FinanceTransactionListV3
-    url = "https://api-seller.ozon.ru/v3/finance/transaction/list"
-    # Отнимаем 2 месяца
-    #lastmonth_date = now - datetime.timedelta(days=now.day)
-
-    #print(f"lastmonth_date.month {lastmonth_date.month}")
-
-
-    first_day_last_month = (now.replace(day=1) - datetime.timedelta(days=1)).replace(day=1)
-    last_day_last_month = now.replace(day=1) - datetime.timedelta(days=1)
-    first_day_last_month_iso = first_day_last_month.strftime('%Y-%m-%dT00:00:00.000Z')
-    last_day_last_month_iso = last_day_last_month.strftime('%Y-%m-%dT23:59:59.999Z')
-    print(f"first_day_last_month_iso {first_day_last_month_iso}")
-    print(f"last_day_last_month_iso {last_day_last_month_iso}")
-
-    page_size = 1000  # максимум, который разрешён API
-    page = 1  # начинаем с первой страницы
-    all_operations = []  # здесь соберём все операции
-
-    while True:
-        payload = {
-            "filter": {
-                "date": {
-                    "from": first_day_last_month_iso,
-                    "to": last_day_last_month_iso
-                },
-                "operation_type": [],  # или перечислите нужные
-                "posting_number": "",
-                "transaction_type": "all"
-            },
-            "page": page,
-            "page_size": page_size
+        sku_offer_id = {
+            source["sku"]: item["offer_id"]
+            for item in ozon_products['items']
+            for source in item["sources"]
         }
+        logger_info.info(f"ozon_get_finance: sku_offer_id created with {len(sku_offer_id)} items")
+
+        #print(json.dumps(prod_ozon['items'], indent=4, ensure_ascii=False))
+
+        products = ms_get_product(headers)
+        logger_info.info(f"ozon_get_finance: ms_get_product returned with status_code {products['status_code']}")
+        ms_opt_price_clear = {}
+        #print(f"products {products}")
+        if products['status_code'] != 200:
+            logger_error.error(f"ozon_get_finance: Error from ms_get_product: {products}")
+            return {'error': products}
+
+        for item in products['response']['rows']:
+            #opt_price_clear['article'] = item['article']
+            #print(f"opt_price {item['buyPrice']['value']/100}")
+            ms_opt_price_clear[item['article']] = {
+                'opt_price': int(float(item['buyPrice']['value']) / 100) if 'buyPrice' in item and 'value' in item['buyPrice'] else 0
+                }
+        logger_info.info(f"ozon_get_finance: ms_opt_price_clear created with {len(ms_opt_price_clear)} items")
+
+        now = datetime.datetime.now()
+
+        #url = "https://api-seller.ozon.ru/v2/finance/realization"
+        #lastmonth_date = now - relativedelta(months=1)
         #data = {
         #    "year": lastmonth_date.year,
         #    "month": lastmonth_date.month
         #}
 
-        response = requests.post(url, headers=headers['ozon_headers'], json=payload).json()
-        result = response.get("result", {})
-        operations = result.get("operations", [])
-        all_operations.extend(operations)
+        #response = requests.post(url, headers=headers['ozon_headers'], json=data).json()
 
-        print(f"realization {page}")
-        print(response["result"]["operations"][:1])
-        if page >= result.get("page_count", 0) or not operations:
-            break
-        page += 1  # иначе берём следующую страницу
+        #print(json.dumps(response['result']['rows'], indent=4, ensure_ascii=False))
+        #print(f"response 1 {response['result']['rows']}")
 
-    print(f"Собрано операций: {len(all_operations)}")
+        # https://docs.ozon.ru/api/seller/#operation/FinanceAPI_FinanceTransactionListV3
+        url = "https://api-seller.ozon.ru/v3/finance/transaction/list"
+        # Отнимаем 2 месяца
+        #lastmonth_date = now - datetime.timedelta(days=now.day)
+
+        #print(f"lastmonth_date.month {lastmonth_date.month}")
 
 
-    grouped_data = defaultdict(list)
-    for entry in all_operations:
-        raw_pn = entry['posting'].get('posting_number', 'unknown')
-        #base_pn = ozon_get_base_posting_number(raw_pn)
-        grouped_data[raw_pn].append(entry)
+        first_day_last_month = (now.replace(day=1) - datetime.timedelta(days=1)).replace(day=1)
+        last_day_last_month = now.replace(day=1) - datetime.timedelta(days=1)
+        first_day_last_month_iso = first_day_last_month.strftime('%Y-%m-%dT00:00:00.000Z')
+        last_day_last_month_iso = last_day_last_month.strftime('%Y-%m-%dT23:59:59.999Z')
+        print(f"first_day_last_month_iso {first_day_last_month_iso}")
+        print(f"last_day_last_month_iso {last_day_last_month_iso}")
+        logger_info.info(f"ozon_get_finance: Date range for finance API: {first_day_last_month_iso} to {last_day_last_month_iso}")
 
-    grouped_data = dict(grouped_data)
+        page_size = 1000  # максимум, который разрешён API
+        page = 1  # начинаем с первой страницы
+        all_operations = []  # здесь соберём все операции
 
-    # Выводим результат в JSON-формате для удобства чтения
-    #print(json.dumps(grouped_data, indent=4, ensure_ascii=False))
-    #exit()
-    #print(f"realization {grouped_data}")
-    result = {}
-    summed_totals = {}
-    total_payoff = 0
-    payoff_if = 0
-    all_return_total = 0
-    #print(f"sku_offer_id {sku_offer_id}")
+        while True:
+            payload = {
+                "filter": {
+                    "date": {
+                        "from": first_day_last_month_iso,
+                        "to": last_day_last_month_iso
+                    },
+                    "operation_type": [],  # или перечислите нужные
+                    "posting_number": "",
+                    "transaction_type": "all"
+                },
+                "page": page,
+                "page_size": page_size
+            }
+            #data = {
+            #    "year": lastmonth_date.year,
+            #    "month": lastmonth_date.month
+            #}
+            logger_info.info(f"ozon_get_finance: Calling Ozon Finance API page {page} with payload {payload}")
+            response = requests.post(url, headers=headers['ozon_headers'], json=payload).json()
+            logger_info.info(f"ozon_get_finance: Ozon Finance API response status: {response.get('code')}")
+            result = response.get("result", {})
+            operations = result.get("operations", [])
+            all_operations.extend(operations)
 
-    # - Если цена продажи sale_price будет 0, тогда пропускать этот товар для вывода в общий список продаж
+            print(f"realization {page}")
+            print(response["result"]["operations"][:1])
+            if page >= result.get("page_count", 0) or not operations:
+                break
+            page += 1  # иначе берём следующую страницу
 
-    for posting_number, items in grouped_data.items():
-        #print(f"№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№")
-        print(f"posting_number {posting_number}\n\n")
+        logger_info.info(f"ozon_get_finance: Total operations collected: {len(all_operations)}")
+        print(f"Собрано операций: {len(all_operations)}")
 
-        sale_price = 0 # цена продажи
-        payoff = 0
-        new_entry = {}
-        print(f'items {items}')
-        for item in items:
+
+        grouped_data = defaultdict(list)
+        for entry in all_operations:
+            raw_pn = entry['posting'].get('posting_number', 'unknown')
+            #base_pn = ozon_get_base_posting_number(raw_pn)
+            grouped_data[raw_pn].append(entry)
+        logger_info.info(f"ozon_get_finance: Data grouped by posting number. Number of groups: {len(grouped_data)}")
+        grouped_data = dict(grouped_data)
+
+        # Выводим результат в JSON-формате для удобства чтения
+        #print(json.dumps(grouped_data, indent=4, ensure_ascii=False))
+        #exit()
+        #print(f"realization {grouped_data}")
+        result = {}
+        summed_totals = {}
+        total_payoff = 0
+        payoff_if = 0
+        all_return_total = 0
+        #print(f"sku_offer_id {sku_offer_id}")
+
+        # - Если цена продажи sale_price будет 0, тогда пропускать этот товар для вывода в общий список продаж
+
+        for posting_number, items in grouped_data.items():
+            logger_info.info(f"ozon_get_finance: Processing posting number: {posting_number}")
+            #print(f"№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№№")
+            print(f"posting_number {posting_number}\n\n")
+
+            sale_price = 0 # цена продажи
+            payoff = 0
+            new_entry = {}
+            print(f'items {items}')
+            for item in items:
+                #print(f"^^^^^^^^^^^^^^^^^^")
+                item_s = item.get('items')
+                #print(f'item_s {item_s}\n')
+                if item_s and len(item_s) > 0:
+                    sku = item_s[0].get('sku')
+                    offer_id = sku_offer_id.get(sku)
+                    opt_data = ms_opt_price_clear.get(offer_id)
+                    opt = opt_data.get('opt_price') if opt_data else 0
+                    name = item.get('name', 'unknown')
+                    logger_info.info(f"ozon_get_finance: Item details: sku={sku}, offer_id={offer_id}, opt={opt}")
+                    #print(f'sku {sku} offer_id {offer_id}\n')
+                    #print(f'opt {opt}\n')
+
+                accruals = item.get('accruals_for_sale', 0)
+                if accruals != 0:  # учитываем только товарные строки
+                    sale_price += accruals
+                payoff += item.get('amount', 0)  # все строки влияют на выплату
+            service_fees = sale_price - payoff
+            logger_info.info(f"ozon_get_finance: Posting {posting_number} calculated: sale_price={sale_price}, payoff={payoff}, service_fees={service_fees}")
+            print(f'sale_price {sale_price}\n')
+            print(f'payoff {payoff}\n')
+            print(f'service_fees {service_fees}\n')
+            print(f"^^^^^^^^^^^^^^^^^^")
+            print(f"^^^^^^^^^^^^^^^^^^")
+            print(f"^^^^^^^^^^^^^^^^^^")
+
+
+            total_payoff += int(payoff)
+
+            # total_payoff это сумма всех движенией за месяц, включая выплаты или возвраты за предыдыщуие заказаы и или месяцы
+            # all_payoff это сумма именно заказов внутри месяца, она может быть выше, поскольку не учитывает вычиты с других заказаов, которые не привязаны
+            # к конкретному заказу. в сумме выплат указывается значение total_payoff, но если суммировать все заказы, сумма будет выше, поскольку для каждого заказа не учетны эти расходы
+
+            #print(f'total_payoff {total_payoff}')
             #print(f"^^^^^^^^^^^^^^^^^^")
-            item_s = item.get('items')
-            #print(f'item_s {item_s}\n')
-            if item_s and len(item_s) > 0:
-                sku = item_s[0].get('sku')
-                offer_id = sku_offer_id.get(sku)
-                opt_data = ms_opt_price_clear.get(offer_id)
-                opt = opt_data.get('opt_price') if opt_data else 0
-                name = item.get('name', 'unknown')
-                #print(f'sku {sku} offer_id {offer_id}\n')
-                #print(f'opt {opt}\n')
 
-            accruals = item.get('accruals_for_sale', 0)
-            if accruals != 0:  # учитываем только товарные строки
-                sale_price += accruals
-            payoff += item.get('amount', 0)  # все строки влияют на выплату
-        service_fees = sale_price - payoff
-        print(f'sale_price {sale_price}\n')
-        print(f'payoff {payoff}\n')
-        print(f'service_fees {service_fees}\n')
-        print(f"^^^^^^^^^^^^^^^^^^")
-        print(f"^^^^^^^^^^^^^^^^^^")
-        print(f"^^^^^^^^^^^^^^^^^^")
-
-
-        total_payoff += int(payoff)
-
-        # total_payoff это сумма всех движенией за месяц, включая выплаты или возвраты за предыдыщуие заказаы и или месяцы
-        # all_payoff это сумма именно заказов внутри месяца, она может быть выше, поскольку не учитывает вычиты с других заказаов, которые не привязаны
-        # к конкретному заказу. в сумме выплат указывается значение total_payoff, но если суммировать все заказы, сумма будет выше, поскольку для каждого заказа не учетны эти расходы
-
-        #print(f'total_payoff {total_payoff}')
-        #print(f"^^^^^^^^^^^^^^^^^^")
-
-        if opt != 0 and opt is not None and sale_price != 0:
-            new_entry.update({
-                'quantity': 1,
-                'name': posting_number,
-                'product_id': int(sku),
-                'sale_price': int(sale_price),
-                'opt': int(opt),
-                'fees': int(service_fees),
-                'payoff': int(payoff), # к выплате
+            if opt != 0 and opt is not None and sale_price != 0:
+                new_entry.update({
+                    'quantity': 1,
+                    'name': posting_number,
+                    'product_id': int(sku),
+                    'sale_price': int(sale_price),
+                    'opt': int(opt),
+                    'fees': int(service_fees),
+                    'payoff': int(payoff), # к выплате
+                    })
+                net_profit = int(payoff) - int(opt)
+                posttax_profit = net_profit - (int(payoff) * 0.06)
+                net_profit_perc = (net_profit / int(opt)) * 100
+                posttax_profit_perc = (posttax_profit / int(opt)) * 100
+                new_entry.update({
+                    'net_profit': int(net_profit),
+                    'net_profit_perc': int(net_profit_perc),
+                    'posttax_profit': int(posttax_profit),
+                    'posttax_profit_perc': int(posttax_profit_perc),
                 })
-            net_profit = int(payoff) - int(opt)
-            posttax_profit = net_profit - (int(payoff) * 0.06)
-            net_profit_perc = (net_profit / int(opt)) * 100
-            posttax_profit_perc = (posttax_profit / int(opt)) * 100
-            new_entry.update({
-                'net_profit': int(net_profit),
-                'net_profit_perc': int(net_profit_perc),
-                'posttax_profit': int(posttax_profit),
-                'posttax_profit_perc': int(posttax_profit_perc),
-            })
+                logger_info.info(f"ozon_get_finance: New entry created for {posting_number}")
+                if offer_id is not None:
+                    if offer_id in result:
+                        result[offer_id].append(new_entry)
+                    else:
+                        result[offer_id] = [new_entry]
+                #print(f'result {offer_id} posting_number {posting_number} NEW ENTRY {new_entry}')
 
-            if offer_id is not None:
-                if offer_id in result:
-                    result[offer_id].append(new_entry)
-                else:
-                    result[offer_id] = [new_entry]
-            #print(f'result {offer_id} posting_number {posting_number} NEW ENTRY {new_entry}')
+            #print(f'items {items}')
+            #print(f"^^^^^^^^^^^^^^^^^^\n")
+        logger_info.info(f"ozon_get_finance: Total payoff after processing postings: {total_payoff}")
+        print(f'total_payoff {total_payoff}')
+        print(f"^^^^^^^^^^^^^^^^^^")
+        #print(json.dumps(result, indent=4, ensure_ascii=False))
+        # seller_price_per_instance Цена продавца с учётом скидки.
+        # 'item': {'offer_id': 'cer_black_20', 'barcode': 'OZN1249002486', 'sku': 1249002486},
+        sorted_report = dict(sorted(result.items(), key=lambda item: (item[0][:3], item[0][3:])))
+        logger_info.info("ozon_get_finance: Report sorted.")
 
-        #print(f'items {items}')
-        #print(f"^^^^^^^^^^^^^^^^^^\n")
-    print(f'total_payoff {total_payoff}')
-    print(f"^^^^^^^^^^^^^^^^^^")
-    #print(json.dumps(result, indent=4, ensure_ascii=False))
-    # seller_price_per_instance Цена продавца с учётом скидки.
-    # 'item': {'offer_id': 'cer_black_20', 'barcode': 'OZN1249002486', 'sku': 1249002486},
-    sorted_report = dict(sorted(result.items(), key=lambda item: (item[0][:3], item[0][3:])))
+        # Итерация по результатам и вычисление суммы total_price
+        for offer_id, entries in result.items():
+            logger_info.info(f"ozon_get_finance: Calculating summed totals for offer_id: {offer_id}")
+            #print(f'entries {entries}')
+            offer_id_total_payoff = sum(entry['payoff'] for entry in entries)
+            net_profit_sum = sum(entry['net_profit'] for entry in entries)
+            net_profit_sum = sum(entry['net_profit'] for entry in entries)
+            posttax_profit_sum = sum(entry['posttax_profit'] for entry in entries)
+            total_quantity = sum(entry['quantity'] for entry in entries)
 
-    # Итерация по результатам и вычисление суммы total_price
-    for offer_id, entries in result.items():
-        #print(f'entries {entries}')
-        offer_id_total_payoff = sum(entry['payoff'] for entry in entries)
-        net_profit_sum = sum(entry['net_profit'] for entry in entries)
-        net_profit_sum = sum(entry['net_profit'] for entry in entries)
-        posttax_profit_sum = sum(entry['posttax_profit'] for entry in entries)
-        total_quantity = sum(entry['quantity'] for entry in entries)
+            # Расчет средней цены продажи
+            average_sales_price = payoff / total_quantity if total_quantity > 0 else 0
 
-        # Расчет средней цены продажи
-        average_sales_price = payoff / total_quantity if total_quantity > 0 else 0
+            average_percent_posttax = sum(entry['posttax_profit_perc'] for entry in entries) / len(
+                entries) if entries else 0
 
-        average_percent_posttax = sum(entry['posttax_profit_perc'] for entry in entries) / len(
-            entries) if entries else 0
+            # Сохраняем результаты в словарь
+            summed_totals[offer_id] = {
+                "payoff": int(offer_id_total_payoff),
+                "net_profit_sum": int(net_profit_sum),
+                "posttax_profit_sum": int(posttax_profit_sum),
+                "average_sales_price": int(average_sales_price),
+                "average_percent_posttax": int(average_percent_posttax),
+                "total_quantity": int(total_quantity),
+            }
+            #print(json.dumps(entries, indent=4, ensure_ascii=False))
+            #print(f"^^^^^^^^^^^^^^^^^^")
+            #print(json.dumps(summed_totals[offer_id], indent=4, ensure_ascii=False))
+            #print(f"#################")
+            #print(f"#################")
+            #print(f"#################")
+            #print(f"#################")
+            #print(f"#################")
 
-        # Сохраняем результаты в словарь
-        summed_totals[offer_id] = {
-            "payoff": int(offer_id_total_payoff),
-            "net_profit_sum": int(net_profit_sum),
-            "posttax_profit_sum": int(posttax_profit_sum),
-            "average_sales_price": int(average_sales_price),
-            "average_percent_posttax": int(average_percent_posttax),
-            "total_quantity": int(total_quantity),
+        logger_info.info(f"ozon_get_finance: Summed totals calculated for {len(summed_totals)} offer_ids.")
+        #print(f'summed_totals {summed_totals}')
+        #print(json.dumps(summed_totals, indent=4, ensure_ascii=False))
+        all_totals = {
+            "all_total_price_sum": total_payoff, # выводим именно суммы выплаты, а не сумму всех заказов
+            "all_net_profit_sum": sum(value["net_profit_sum"] for value in summed_totals.values()),
+            "all_posttax_profit_sum": sum(value["posttax_profit_sum"] for value in summed_totals.values()),
+            "all_quantity": sum(value["total_quantity"] for value in summed_totals.values()),
+            "all_return_total": all_return_total
         }
-        #print(json.dumps(entries, indent=4, ensure_ascii=False))
-        #print(f"^^^^^^^^^^^^^^^^^^")
-        #print(json.dumps(summed_totals[offer_id], indent=4, ensure_ascii=False))
-        #print(f"#################")
-        #print(f"#################")
-        #print(f"#################")
-        #print(f"#################")
-        #print(f"#################")
+        all_totals = {
+            key: f"{value:,}" if isinstance(value, (int, float)) else value
+            for key, value in all_totals.items()
+        }
+        logger_info.info(f"ozon_get_finance: All totals calculated: {all_totals}")
 
-    #print(f'summed_totals {summed_totals}')
-    #print(json.dumps(summed_totals, indent=4, ensure_ascii=False))
-    all_totals = {
-        "all_total_price_sum": total_payoff, # выводим именно суммы выплаты, а не сумму всех заказов
-        "all_net_profit_sum": sum(value["net_profit_sum"] for value in summed_totals.values()),
-        "all_posttax_profit_sum": sum(value["posttax_profit_sum"] for value in summed_totals.values()),
-        "all_quantity": sum(value["total_quantity"] for value in summed_totals.values()),
-        "all_return_total": all_return_total
-    }
-    all_totals = {
-        key: f"{value:,}" if isinstance(value, (int, float)) else value
-        for key, value in all_totals.items()
-    }
+        locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
 
-    locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
+        start_date = datetime.datetime.strptime(first_day_last_month_iso[:10], '%Y-%m-%d')
+        stop_date = datetime.datetime.strptime(last_day_last_month_iso[:10], '%Y-%m-%d')
 
-    start_date = datetime.datetime.strptime(first_day_last_month_iso[:10], '%Y-%m-%d')
-    stop_date = datetime.datetime.strptime(last_day_last_month_iso[:10], '%Y-%m-%d')
+        month_name = start_date.strftime('%B')
+        morph = pymorphy2.MorphAnalyzer()
+        month_nominative = morph.parse(month_name)[0].inflect({'nomn'}).word
+        day_delta = stop_date - start_date
+        header_data = {}
+        header_data['month'] = month_nominative.capitalize()
+        header_data['day_delta'] = day_delta.days
+        logger_info.info(f"ozon_get_finance: Header data prepared: {header_data}")
 
-    month_name = start_date.strftime('%B')
-    morph = pymorphy2.MorphAnalyzer()
-    month_nominative = morph.parse(month_name)[0].inflect({'nomn'}).word
-    day_delta = stop_date - start_date
-    header_data = {}
-    header_data['month'] = month_nominative.capitalize()
-    header_data['day_delta'] = day_delta.days
-
-    # Выводим отсортированный словарь
-    result = {}
-    result['sorted_report'] = sorted_report
-    result['all_totals'] = all_totals
-    result['summed_totals'] = summed_totals
-    result['header_data'] = header_data
-    return result
+        # Выводим отсортированный словарь
+        result = {}
+        result['sorted_report'] = sorted_report
+        result['all_totals'] = all_totals
+        result['summed_totals'] = summed_totals
+        result['header_data'] = header_data
+        logger_info.info(f"ozon_get_finance: Function finished, returning result.")
+        return result
+    except Exception as e:
+        logger_error.error(f"ozon_get_finance: Unhandled exception: {e}", exc_info=True)
+        return {'error': f"Unhandled exception in ozon_get_finance: {e}"}
 
 def ozon_get_base_posting_number(posting_number: str) -> str:
     """
@@ -987,6 +1020,7 @@ def ozon_update_promo(promo_data, seller, headers):
         response_raw = requests.post(url, headers=headers['ozon_headers'], json=promo_data, timeout=10)
         try:            
             response = response_raw.json()            
+            logger_info.info(f"ozon_update_promo: Ozon API response: {response}")
             return JsonResponse({'success': True, 'response': response})
         
         except Exception as e:
@@ -1001,3 +1035,290 @@ def ozon_update_promo(promo_data, seller, headers):
     except Exception as err:
         logger_error.error(f"Other error occurred: {err}")
         return JsonResponse({'success': False, 'error': str(err)})
+
+
+def ozon_update_price(price_data, seller, headers):
+    """
+    Обновляет цену и минимальную цену товара на Ozon.
+
+    :param price_data: dict c ключами offer_id, yourprice, minprice
+    :param seller: экземпляр Seller
+    :param headers: заголовки для Ozon API
+    :return: JsonResponse об успехе/ошибке
+    """
+
+    url = "https://api-seller.ozon.ru/v1/product/import/prices"
+
+    offer_id = price_data.get('offer_id')
+    if not offer_id:
+        return JsonResponse({'success': False, 'error': 'offer_id is required'})
+
+    price = _prepare_price_value(price_data.get('yourprice'))
+    min_price = _prepare_price_value(price_data.get('minprice'))
+
+    if price is None and min_price is None:
+        return JsonResponse({'success': False, 'error': 'price or minprice must be provided'})
+
+    request_body = {
+        "prices": [
+            {
+                "offer_id": str(offer_id),
+                **({"price": price} if price is not None else {}),
+                **({"min_price": min_price} if min_price is not None else {}),
+                "currency_code": "RUB"
+            }
+        ]
+    }
+
+    logger_info.info(f"ozon_update_price: Sending data {request_body}")
+
+    try:
+        response_raw = requests.post(url, headers=headers['ozon_headers'], json=request_body, timeout=10)
+        response_raw.raise_for_status()
+        try:
+            response = response_raw.json()
+            logger_info.info(f"ozon_update_price: Ozon API response: {response}")
+            return JsonResponse({'success': True, 'response': response})
+        except ValueError as e:
+            logger_error.error(f"ozon_update_price: JSON decode error: {e} | raw: {response_raw.text}")
+            return JsonResponse({'success': False, 'error': f"Json decode error: {e}", 'response': response_raw.text})
+    except requests.exceptions.Timeout:
+        logger_error.error("ozon_update_price: Ozon API timeout")
+        return JsonResponse({'success': False, 'error': 'Ozon API timeout'})
+    except requests.exceptions.RequestException as e:
+        logger_error.error(f"ozon_update_price: Request error: {e}")
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+def ozon_get_discount_tasks(headers, status=None, page=1, limit=50):
+    """Получает список заявок на скидку из Ozon."""
+
+    statuses = status
+    if statuses is None:
+        statuses = ["NEW", "SEEN"]
+    elif isinstance(statuses, str):
+        statuses = [statuses]
+
+    aggregated_tasks = []
+
+    for status_value in statuses:
+        url = "https://api-seller.ozon.ru/v1/actions/discounts-task/list"
+        payload = {
+            "status": status_value,
+            "page": int(page),
+            "limit": int(limit),
+        }
+
+        logger_info.info(
+            "ozon_get_discount_tasks: requesting tasks with status=%s, page=%s, limit=%s",
+            status_value,
+            page,
+            limit,
+        )
+
+        try:
+            response_raw = requests.post(url, headers=headers['ozon_headers'], json=payload, timeout=10)
+            response_raw.raise_for_status()
+
+            try:
+                response = response_raw.json()
+                tasks = [
+                    item for item in response.get('result', [])
+                    if item.get('status') not in {
+                        'APPROVED', 'PARTLY_APPROVED', 'DECLINED',
+                        'AUTO_DECLINED', 'DECLINED_BY_USER',
+                        'COUPON', 'PURCHASED'
+                    }
+                ]
+
+                logger_info.info(
+                    "ozon_get_discount_tasks: received %d tasks (status=%s, page=%s)",
+                    len(tasks),
+                    status_value,
+                    page,
+                )
+                logger_info.info(
+                    "TASK ozon_get_discount_tasks: %s",
+                    tasks,
+                )                
+                aggregated_tasks.extend(tasks)
+            except ValueError as e:
+                logger_error.error(
+                    "ozon_get_discount_tasks: JSON decode error: %s | raw=%s",
+                    e,
+                    response_raw.text,
+                )
+                return {
+                    'success': False,
+                    'error': f'Json decode error: {e}',
+                    'response': response_raw.text,
+                }
+        except requests.exceptions.Timeout:
+            logger_error.error("ozon_get_discount_tasks: Ozon API timeout (status=%s)", status_value)
+            return {
+                'success': False,
+                'error': 'Ozon API timeout',
+                'status': status_value,
+            }
+        except requests.exceptions.HTTPError as e:
+            response_text = e.response.text if e.response is not None else ''
+            logger_error.error(
+                "ozon_get_discount_tasks: HTTP error for status %s: %s | response=%s",
+                status_value,
+                e,
+                response_text,
+            )
+            return {
+                'success': False,
+                'error': str(e),
+                'status': status_value,
+                'response': response_text,
+            }
+        except requests.exceptions.RequestException as e:
+            logger_error.error("ozon_get_discount_tasks: Request error for status %s: %s", status_value, e)
+            return {
+                'success': False,
+                'error': str(e),
+                'status': status_value,
+            }
+
+    return {
+        'success': True,
+        'result': aggregated_tasks,
+    }
+
+
+def ozon_decline_discount_tasks(headers, tasks):
+    """Отклоняет заявки на скидку."""
+
+    if not tasks:
+        return {
+            'success': False,
+            'error': 'Tasks payload is required',
+        }
+
+    url = "https://api-seller.ozon.ru/v1/actions/discounts-task/decline"
+    payload = {
+        'tasks': tasks,
+    }
+
+    logger_info.info(
+        "ozon_decline_discount_tasks: declining %d task(s)",
+        len(tasks),
+    )
+    logger_info.info(
+        "ozon_decline_discount_tasks: payload=%s",
+        payload,
+    )
+
+    try:
+        response_raw = requests.post(url, headers=headers['ozon_headers'], json=payload, timeout=10)
+        response_raw.raise_for_status()
+
+        try:
+            response = response_raw.json()
+            logger_info.info(
+                "ozon_decline_discount_tasks: success_count=%s, fail_count=%s",
+                response.get('result', {}).get('success_count'),
+                response.get('result', {}).get('fail_count'),
+            )
+            if response.get('result', {}).get('fail_details'):
+                logger_info.info(
+                    "ozon_decline_discount_tasks: fail_details=%s",
+                    response.get('result', {}).get('fail_details'),
+                )
+            return {
+                'success': True,
+                'result': response,
+            }
+        except ValueError as e:
+            logger_error.error(
+                "ozon_decline_discount_tasks: JSON decode error: %s | raw=%s",
+                e,
+                response_raw.text,
+            )
+            return {
+                'success': False,
+                'error': f'Json decode error: {e}',
+                'response': response_raw.text,
+            }
+    except requests.exceptions.Timeout:
+        logger_error.error("ozon_decline_discount_tasks: Ozon API timeout")
+        return {
+            'success': False,
+            'error': 'Ozon API timeout',
+        }
+    except requests.exceptions.RequestException as e:
+        logger_error.error("ozon_decline_discount_tasks: Request error: %s", e)
+        return {
+            'success': False,
+            'error': str(e),
+        }
+
+
+def ozon_approve_discount_tasks(headers, tasks):
+    """Согласовывает заявки на скидку."""
+
+    if not tasks:
+        return {
+            'success': False,
+            'error': 'Tasks payload is required',
+        }
+
+    url = "https://api-seller.ozon.ru/v1/actions/discounts-task/approve"
+    payload = {
+        'tasks': tasks,
+    }
+
+    logger_info.info(
+        "ozon_approve_discount_tasks: approving %d task(s)",
+        len(tasks),
+    )
+    logger_info.info(
+        "ozon_approve_discount_tasks: payload=%s",
+        payload,
+    )
+
+    try:
+        response_raw = requests.post(url, headers=headers['ozon_headers'], json=payload, timeout=10)
+        response_raw.raise_for_status()
+
+        try:
+            response = response_raw.json()
+            logger_info.info(
+                "ozon_approve_discount_tasks: success_count=%s, fail_count=%s",
+                response.get('result', {}).get('success_count'),
+                response.get('result', {}).get('fail_count'),
+            )
+            if response.get('result', {}).get('fail_details'):
+                logger_info.info(
+                    "ozon_approve_discount_tasks: fail_details=%s",
+                    response.get('result', {}).get('fail_details'),
+                )
+            return {
+                'success': True,
+                'result': response,
+            }
+        except ValueError as e:
+            logger_error.error(
+                "ozon_approve_discount_tasks: JSON decode error: %s | raw=%s",
+                e,
+                response_raw.text,
+            )
+            return {
+                'success': False,
+                'error': f'Json decode error: {e}',
+                'response': response_raw.text,
+            }
+    except requests.exceptions.Timeout:
+        logger_error.error("ozon_approve_discount_tasks: Ozon API timeout")
+        return {
+            'success': False,
+            'error': 'Ozon API timeout',
+        }
+    except requests.exceptions.RequestException as e:
+        logger_error.error("ozon_approve_discount_tasks: Request error: %s", e)
+        return {
+            'success': False,
+            'error': str(e),
+        }

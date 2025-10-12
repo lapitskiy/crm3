@@ -88,7 +88,7 @@
                 <div class="menu-sub menu-sub-accordion pt-3">
                     <!--begin::Menu item-->
                     <div class="menu-item">
-                        <a href="#" class="menu-link py-3">
+                        <a href="{% url 'autoupdate' %}" class="menu-link py-3">
                             <span class="menu-bullet">
                                 <span class="bullet bullet-dot"></span>
                             </span>
@@ -203,6 +203,15 @@
                 </a>
             </div>
             <!--end::Menu item-->
+
+            <div class="menu-item">
+                <a href="{% url 'wb_minimal_price' %}" class="menu-link py-3">
+                    <span class="menu-bullet">
+                        <span class="bullet bullet-dot"></span>
+                    </span>
+                    <span class="menu-title">Минимальная цена WB</span>
+                </a>
+            </div>
 
             <!--begin::Menu item-->
             <div class="menu-item">

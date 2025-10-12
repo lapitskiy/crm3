@@ -11,6 +11,164 @@ import json
 logger_info = logging.getLogger('crm3_info')
 logger_error = logging.getLogger('crm3_error')
 
+
+def wb_get_all_price(headers):
+    result = {}
+    opt_price_clear = {}
+    opt_price = ms_get_product(headers)
+    if opt_price and opt_price.get('error') is None:
+        for item in opt_price['response']['rows']:
+            opt_price_clear[item['article']] = {
+                'opt_price': int(float(item['buyPrice']['value']) / 100),
+            }
+    else:
+        logger_error.error(f"wb_get_all_price: ошибка получения оптовых цен из MoySklad: {opt_price.get('error') if isinstance(opt_price, dict) else 'unknown error'}")
+        opt_price_clear = {}
+
+    # продажи за последние 30 дней (обновлено на v5)
+    url = "https://statistics-api.wildberries.ru/api/v5/supplier/reportDetailByPeriod"
+    dateTo = datetime.datetime.now()
+    dateFrom = dateTo - datetime.timedelta(days=30)
+    params = {
+        'dateFrom': dateFrom.strftime('%Y-%m-%d'),
+        'dateTo': dateTo.strftime('%Y-%m-%d'),
+        'limit': 100
+    }
+    #print(f"data wb {params}")
+    realization = {}
+    try:
+        resp = requests.get(url, headers=headers['wb_headers'], params=params, timeout=10)
+        try:
+            response = resp.json()
+        except Exception as e:
+            logger_error.error(f"wb_get_all_price: JSON decode error for stats v5: {e}, text={resp.text}")
+            response = []
+    except requests.exceptions.RequestException as e:
+        logger_error.error(f"wb_get_all_price: stats v5 request error: {e}")
+        response = []
+    #print(f"date resp wb json {response}")
+    # v5 обычно возвращает список словарей; аккумулируем продажи по offer_id если возможно
+    if isinstance(response, list):
+        for row in response:
+            offer_id = row.get('sa_name') or row.get('offer_id')
+            sale_qty = int(row.get('quantity') or row.get('sale_qty') or 0)
+            if not offer_id:
+                continue
+            if offer_id in realization:
+                realization[offer_id]['sale_qty'] = realization[offer_id]['sale_qty'] + sale_qty
+            else:
+                realization[offer_id] = {'sale_qty': sale_qty}
+
+    # Товары и цены: устаревший discounts-prices API может быть недоступен; оборачиваем в try/except
+    result = {}
+    goods_url = "https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter"
+    # Собираем nmList из статистики v5 (response) и строим мапу nm_id->offer_id
+    nm_id_to_offer: dict[int, str] = {}
+    nm_list: list[int] = []
+    if isinstance(response, list):
+        for row in response:
+            try:
+                nm = int(row.get('nm_id')) if row.get('nm_id') is not None else None
+            except Exception:
+                nm = None
+            offer = row.get('sa_name') or row.get('offer_id')
+            if nm and offer and nm not in nm_id_to_offer:
+                nm_id_to_offer[nm] = offer
+                nm_list.append(nm)
+    # Бьем на батчи (до 1000 на запрос, с запасом используем 200)
+    def chunks(lst, n):
+        for i in range(0, len(lst), n):
+            yield lst[i:i+n]
+    try:
+        aggregated_items = []
+        for batch in chunks(nm_list, 200):
+            if not batch:
+                continue
+            goods_payload = {"nmList": batch}
+            goods_resp = requests.post(goods_url, headers=headers['wb_headers'], json=goods_payload, timeout=10)
+            goods_resp.raise_for_status()
+            goods_json = goods_resp.json()
+            print(f"response wb goods batch size={len(batch)} -> {str(goods_json)[:1000]}")
+            # Пытаемся гибко вытащить список товаров
+            items = []
+            if isinstance(goods_json, list):
+                items = goods_json
+            elif isinstance(goods_json, dict):
+                data_section = goods_json.get('data')
+                if isinstance(data_section, dict) and isinstance(data_section.get('listGoods'), list):
+                    items = data_section.get('listGoods')
+                else:
+                    items = goods_json.get('result', {}).get('items') or goods_json.get('listGoods') or goods_json.get('items') or []
+            if items and isinstance(items, list):
+                aggregated_items.extend(items)
+        # Сбор итогового словаря result
+        for gi in aggregated_items:
+            # nmId может называться по-разному
+            nm = gi.get('nmID') or gi.get('nmId') or gi.get('nm') or gi.get('nm_id')
+            offer_id = gi.get('vendorCode')
+            if not offer_id and nm:
+                try:
+                    offer_id = nm_id_to_offer.get(int(nm))
+                except Exception:
+                    offer_id = None
+            if not offer_id:
+                continue
+            # Цены приходят в sizes; берём первую размерную позицию
+            sizes = gi.get('sizes') or []
+            size0 = sizes[0] if sizes else {}
+            price = int(size0.get('price') or 0)
+            marketing_seller_price = int(size0.get('discountedPrice') or 0)
+            if offer_id not in realization:
+                realization[offer_id] = {'sale_qty': 0}
+            opt = opt_price_clear.get(offer_id, {}).get('opt_price', 0)
+            # Без комиссий WB оценим минимум как opt*1.3, доставка/комиссии поставить 0
+            delivery_price = 0
+            min_price = int(opt * 1.3)
+            profit_price = int(marketing_seller_price) - delivery_price - opt
+            profit_percent = int((profit_price / opt * 100)) if opt else 0
+            result[offer_id] = {
+                'price': price,
+                'min_price': min_price,
+                'marketing_seller_price': marketing_seller_price,
+                'delivery_price': delivery_price,
+                'opt_price': opt,
+                'profit_price': profit_price,
+                'profit_percent': profit_percent,
+                'sale_qty': realization[offer_id]['sale_qty']
+            }
+    except requests.exceptions.RequestException as e:
+        logger_error.error(f"wb_get_all_price: goods API request error: {e}")
+        # Фолбэк: сформируем минимум по известным offer_id из opt_price/realization, чтобы не падать
+        for offer_id in set(list(opt_price_clear.keys()) + list(realization.keys())):
+            result[offer_id] = {
+                'price': 0,
+                'min_price': 0,
+                'marketing_seller_price': 0,
+                'delivery_price': 0,
+                'opt_price': opt_price_clear.get(offer_id, {}).get('opt_price', 0),
+                'profit_price': 0,
+                'profit_percent': 0,
+                'sale_qty': realization.get(offer_id, {}).get('sale_qty', 0)
+            }
+    # Если после успешных запросов result все еще пуст, включаем fallback на объединение ключей
+    if not result:
+        logger_error.warning("wb_get_all_price: empty result after goods API; using fallback union of opt/realization")
+        for offer_id in set(list(opt_price_clear.keys()) + list(realization.keys())):
+            result[offer_id] = {
+                'price': 0,
+                'min_price': 0,
+                'marketing_seller_price': 0,
+                'delivery_price': 0,
+                'opt_price': opt_price_clear.get(offer_id, {}).get('opt_price', 0),
+                'profit_price': 0,
+                'profit_percent': 0,
+                'sale_qty': realization.get(offer_id, {}).get('sale_qty', 0)
+            }
+
+    #print(f'result ozon price {result}')
+    return result
+
+
 def wb_update_inventory(headers, stock):
     """
     Обновляет инвентарь на Wildberries.
@@ -149,7 +307,7 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
             all_orders = response.json() # тут статусов нет
             #print(f'Z' * 40)
             #print(f'Z' * 40)
-            #print(f"response_json all_orders: {all_orders}")            
+            #print(f"response_json all_orders: {all_orders}")
             #print(f'Z' * 40)
             #print(f'Z' * 40)
         else:
@@ -169,8 +327,8 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
     all_status = {
         "orders": [order["id"] for order in all_orders["orders"]]
     }
-    
-    
+
+
     if "orders" in all_orders and isinstance(all_orders["orders"], list):
         all_status = {
             "orders": [order["id"] for order in all_orders["orders"]]
@@ -179,7 +337,7 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
         logger_error.error(f"[wb_get_status_fbs]: ключ 'orders' отсутствует в ответе: {all_orders}")
         result['error'] = f"Ключ 'orders' отсутствует в ответе: {all_orders}"
         return result
-    
+
     new_ids = [int(oid) for oid in db_ids if int(oid) not in all_status["orders"]]
 
     all_status["orders"] = (new_ids + all_status["orders"])[:1000]
@@ -194,10 +352,10 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
 
     try:
         response = requests.post(url_status_awaiting, headers=wb_headers, json=all_status)
-        #print(f'STATUS')    
+        #print(f'STATUS')
         if response.status_code == 200:
             status = response.json()
-            #print(f"response_json status: {status}")            
+            #print(f"response_json status: {status}")
         else:
             #print(f"response_json status: {response.text}")
             result['error'] = response.text
@@ -255,7 +413,7 @@ def wb_get_status_fbs(headers: dict, seller: Seller):
     #print(f'%' * 40)
     #print(f"existing_orders {existing_orders}")
     #print(f'%' * 40)
-    
+
     for current_status in status_list:
         for order in filtered_status_map[current_status]:
             posting_number = str(order["id"])
@@ -567,13 +725,13 @@ def wb_get_finance_report(headers: dict, period: str):
 
 def wb_get_realized(headers: dict, ms_product: dict) -> dict:
     response = wb_get_realized_responce(headers=headers)
-    
+
     realization = wb_create_realized_data(response=response, opt_price=ms_product['opt_price'])
     return realization
 
 
 # 1 - data["sale"] - содержит вы выплаты wb
-# 2 - 
+# 2 -
 def wb_create_realized_data(response: list, opt_price: dict) -> dict:
 
         #print(f"responce {response}")
@@ -611,7 +769,7 @@ def wb_create_realized_data(response: list, opt_price: dict) -> dict:
 
             # Продажа
             if supplier_oper_name == "Продажа":
-                srid_map[srid]["sale_raw"] = item                
+                srid_map[srid]["sale_raw"] = item
 
             # Логистика
             elif supplier_oper_name == "Логистика":
@@ -673,12 +831,12 @@ def wb_create_realized_data(response: list, opt_price: dict) -> dict:
 
         # Выведем первые 2 элементов srid_map как json
         #print(json.dumps(dict(list(srid_map.items())[:2]), ensure_ascii=False, indent=2))
-        
+
         # commission_percent Размер кВВ, %
         # ppvz_reward Возмещение за выдачу и возврат товаров на ПВЗ
         # acquiring_percent Размер комиссии за эквайринг/Комиссии за организацию платежей, %
         # Склад поставщика in office_name
-        
+
         # Группируем продажи по offerid
         # Группируем продажи по offerid и по типу склада (mystore/wbstore)
         offerid_sales = {}
@@ -743,7 +901,7 @@ def wb_create_realized_data(response: list, opt_price: dict) -> dict:
                             store["commission_percent"].append(float(commission_percent))
                         except Exception:
                             pass
-                        
+
         # Усредняем значения по каждому offerid и типу склада, округляя до двух знаков после запятой
         for offerid in offerid_sales:
             for store_type in ("mystore", "wbstore"):
@@ -756,15 +914,15 @@ def wb_create_realized_data(response: list, opt_price: dict) -> dict:
         # Теперь offerid_sales = {'offerid1': {srid1: {...}, srid2: {...}}, 'offerid2': {...}, ...}
         # Если нужно значения в list:
         # offerid_sales_list = {offerid: list(sales.values()) for offerid, sales in offerid_sales.items()}
-        
 
 
-        
+
+
         print(json.dumps(dict(list(offerid_sales.items())[:3]), ensure_ascii=False, indent=2))
         exit()
-        
-        
-        # тут 
+
+
+        # тут
         for item in response.get('result', {}).get('rows', []):
             offer_id = item['item'].get('sa_name')
             quantity = item['delivery_commission']['quantity'] if item.get('delivery_commission') and 'quantity' in item['delivery_commission'] else 0
@@ -824,10 +982,10 @@ def wb_create_realized_data(response: list, opt_price: dict) -> dict:
                 i += 1
             avg_list = [{len(g): int(sum(g) / len(g))} for g in groups if g]
             realization[offer_id]['avg'] = avg_list
-                      
-    
-# https://dev.wildberries.ru/openapi/financial-reports-and-accounting#tag/Finansovye-otchyoty/paths/~1api~1v5~1supplier~1reportDetailByPeriod/get    
-def wb_get_realized_responce(headers: dict):    
+
+
+# https://dev.wildberries.ru/openapi/financial-reports-and-accounting#tag/Finansovye-otchyoty/paths/~1api~1v5~1supplier~1reportDetailByPeriod/get
+def wb_get_realized_responce(headers: dict):
     url = "https://statistics-api.wildberries.ru/api/v5/supplier/reportDetailByPeriod"
     now = datetime.datetime.now()
     # Вычисляем первый день предыдущего месяца
